@@ -4,17 +4,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -24,127 +26,180 @@ import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
 
-private val Navy = Color(0xFF071426)
-private val Panel = Color(0xFF11243B)
-private val Blue = Color(0xFF2196F3)
-private val White = Color(0xFFF2F6FC)
-private val Muted = Color(0xFF9FB1C8)
+data class FootballLeague(
+    val name: String,
+    val shortcut: String,
+    val season: Int
+)
 
 data class FootballMatch(
     val league: String,
     val home: String,
     val away: String,
     val score: String,
-    val time: String,
+    val date: String,
     val source: String
 )
 
+private val Navy = Color(0xFF081426)
+private val Panel = Color(0xFF12243B)
+private val Blue = Color(0xFF168BFF)
+private val White = Color(0xFFF2F6FC)
+private val Muted = Color(0xFF9DB0C8)
+
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             FootballApp(
-                onLoad = { date, update ->
-                    loadFootballMatches(date, update)
+                loadLeagues = { callback ->
+                    fetchLeagues(callback)
+                },
+                loadMatches = { league, date, callback ->
+                    fetchMatches(league, date, callback)
                 }
             )
         }
     }
 
-    private fun loadFootballMatches(
-        date: String,
-        update: (List<FootballMatch>, String) -> Unit
+    private fun request(url: String): String {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 12000
+        connection.readTimeout = 12000
+        connection.requestMethod = "GET"
+        connection.setRequestProperty("User-Agent", "FootballAIPro/2.0")
+
+        return try {
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun fetchLeagues(
+        callback: (List<FootballLeague>, String) -> Unit
     ) {
         thread {
-            val found = mutableListOf<FootballMatch>()
-            val errors = mutableListOf<String>()
-
             try {
-                val address =
-                    "https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d=$date&s=Soccer"
-                val json = JSONObject(download(address))
-                val events = json.optJSONArray("events") ?: JSONArray()
+                val year = SimpleDateFormat("yyyy", Locale.US)
+                    .format(Date()).toInt()
 
-                for (i in 0 until events.length()) {
-                    val event = events.optJSONObject(i) ?: continue
-                    val home = event.optString("strHomeTeam", "")
-                    val away = event.optString("strAwayTeam", "")
-                    if (home.isBlank() || away.isBlank()) continue
+                val json = request(
+                    "https://api.openligadb.de/getavailableleagues/$year"
+                )
 
-                    val hs = event.optString("intHomeScore", "")
-                    val ascore = event.optString("intAwayScore", "")
-                    val score = if (
-                        hs.isNotBlank() && ascore.isNotBlank() &&
-                        hs != "null" && ascore != "null"
-                    ) "$hs : $ascore" else "vs"
+                val array = JSONArray(json)
+                val leagues = mutableListOf<FootballLeague>()
 
-                    found.add(
-                        FootballMatch(
-                            event.optString("strLeague", "Piłka nożna"),
-                            home, away, score,
-                            event.optString("strTime", ""),
-                            "TheSportsDB"
+                for (i in 0 until array.length()) {
+                    val item = array.getJSONObject(i)
+                    val shortcut = item.optString("leagueShortcut")
+                    val name = item.optString("leagueName")
+                    val season = item.optInt("leagueSeason", year)
+
+                    if (shortcut.isNotBlank() && name.isNotBlank()) {
+                        leagues.add(
+                            FootballLeague(name, shortcut, season)
                         )
+                    }
+                }
+
+                runOnUiThread {
+                    callback(
+                        leagues.distinctBy { it.shortcut },
+                        if (leagues.isEmpty()) "Nie znaleziono lig."
+                        else "Załadowano ${leagues.size} lig."
                     )
                 }
             } catch (e: Exception) {
-                errors.add("TheSportsDB")
+                runOnUiThread {
+                    callback(emptyList(), "Błąd pobierania lig: ${e.message}")
+                }
             }
+        }
+    }
 
+    private fun fetchMatches(
+        league: FootballLeague,
+        selectedDate: String,
+        callback: (List<FootballMatch>, String) -> Unit
+    ) {
+        thread {
             try {
-                val year = date.substring(0, 4)
-                val address = "https://api.openligadb.de/getmatchdata/bl1/$year"
-                val json = JSONArray(download(address))
+                val json = request(
+                    "https://api.openligadb.de/getmatchdata/" +
+                        "${league.shortcut}/${league.season}"
+                )
 
-                for (i in 0 until json.length()) {
-                    val match = json.optJSONObject(i) ?: continue
-                    val matchDate = match.optString("matchDateTime", "")
-                    if (!matchDate.startsWith(date)) continue
+                val array = JSONArray(json)
+                val matches = mutableListOf<FootballMatch>()
 
-                    val team1 = match.optJSONObject("team1")
-                        ?.optString("teamName", "") ?: ""
-                    val team2 = match.optJSONObject("team2")
-                        ?.optString("teamName", "") ?: ""
-                    if (team1.isBlank() || team2.isBlank()) continue
+                for (i in 0 until array.length()) {
+                    val item = array.getJSONObject(i)
 
-                    var score = "vs"
-                    val results = match.optJSONArray("matchResults")
-                    if (results != null) {
+                    val date = item.optString("matchDateTime")
+                        .take(10)
+
+                    if (date != selectedDate) continue
+
+                    val team1 = item.optJSONObject("team1")
+                    val team2 = item.optJSONObject("team2")
+
+                    val home = team1?.optString("teamName").orEmpty()
+                    val away = team2?.optString("teamName").orEmpty()
+
+                    if (home.isBlank() || away.isBlank()) continue
+
+                    val results = item.optJSONArray("matchResults")
+                    var score = "Nie rozegrano"
+
+                    if (results != null && results.length() > 0) {
+                        var chosen: JSONObject? = null
+
                         for (j in 0 until results.length()) {
-                            val result = results.optJSONObject(j) ?: continue
-                            if (result.optString("resultName") == "Endergebnis") {
-                                score =
-                                    "${result.optInt("pointsTeam1")} : ${result.optInt("pointsTeam2")}"
+                            val result = results.getJSONObject(j)
+                            if (result.optString("resultName")
+                                    .contains("Endergebnis", true)) {
+                                chosen = result
+                                break
                             }
                         }
+
+                        if (chosen == null) {
+                            chosen = results.getJSONObject(results.length() - 1)
+                        }
+
+                        score = "${chosen.optInt("pointsTeam1")} : " +
+                            "${chosen.optInt("pointsTeam2")}"
                     }
 
-                    found.add(
+                    matches.add(
                         FootballMatch(
-                            match.optString("leagueName", "Bundesliga"),
-                            team1, team2, score,
-                            matchDate.substringAfter("T").take(5),
+                            league.name,
+                            home,
+                            away,
+                            score,
+                            date,
                             "OpenLigaDB"
                         )
                     )
                 }
-            } catch (e: Exception) {
-                errors.add("OpenLigaDB")
-            }
 
-            val unique = found.distinctBy {
-                "${it.home.lowercase()}-${it.away.lowercase()}-$date"
-            }.sortedBy { it.time }
-
-            runOnUiThread {
-                val status = when {
-                    unique.isNotEmpty() ->
-                        "Znaleziono ${unique.size} meczów. Źródła: ${unique.map { it.source }.distinct().joinToString(", ")}"
-                    errors.size == 2 ->
-                        "Oba źródła są chwilowo niedostępne."
-                    else -> "Brak znalezionych meczów dla tej daty."
+                runOnUiThread {
+                    callback(
+                        matches,
+                        if (matches.isEmpty())
+                            "Brak spotkań tej ligi w wybranym dniu."
+                        else
+                            "Znaleziono ${matches.size} spotkań."
+                    )
                 }
-                update(unique, status)
+            } catch (e: Exception) {
+                runOnUiThread {
+                    callback(emptyList(), "Błąd pobierania meczów: ${e.message}")
+                }
             }
         }
     }
@@ -152,169 +207,315 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FootballApp(
-    onLoad: (String, (List<FootballMatch>, String) -> Unit) -> Unit
+    loadLeagues: ((List<FootballLeague>, String) -> Unit) -> Unit,
+    loadMatches: (
+        FootballLeague,
+        String,
+        (List<FootballMatch>, String) -> Unit
+    ) -> Unit
 ) {
+    var leagues by remember { mutableStateOf(emptyList<FootballLeague>()) }
+    var matches by remember { mutableStateOf(emptyList<FootballMatch>()) }
+    var selectedLeague by remember { mutableStateOf<FootballLeague?>(null) }
+    var selectedMatch by remember { mutableStateOf<FootballMatch?>(null) }
     var date by remember {
-        mutableStateOf(
-            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        )
+        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
     }
-    var matches by remember { mutableStateOf(listOf<FootballMatch>()) }
+    var status by remember { mutableStateOf("Ładowanie dostępnych lig...") }
+    var expanded by remember { mutableStateOf(false) }
+    var screen by remember { mutableStateOf("MECZE") }
     var loading by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Wybierz datę i pobierz mecze.") }
+    var history by remember { mutableStateOf(emptyList<FootballMatch>()) }
 
-    MaterialTheme(colorScheme = darkColorScheme(
-        background = Navy,
-        surface = Panel,
-        primary = Blue,
-        onBackground = White,
-        onSurface = White
-    )) {
+    LaunchedEffect(Unit) {
+        loadLeagues { result, message ->
+            leagues = result
+            selectedLeague = result.firstOrNull()
+            status = message
+        }
+    }
+
+    MaterialTheme {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Navy)
-                .verticalScroll(rememberScrollState())
-                .padding(18.dp)
+                .padding(16.dp)
         ) {
             Text(
-                "FOOTBALL AI PRO",
+                "FOOTBALL AI",
+                color = White,
                 fontSize = 27.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = White
+                fontWeight = FontWeight.ExtraBold
             )
             Text(
-                "WERSJA 2.0  •  MULTI DATA",
+                "PRO 2.0  •  ANALIZA PIŁKARSKA",
                 color = Blue,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "MECZE I WYNIKI",
-                color = White,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Data (RRRR-MM-DD)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = White,
-                    unfocusedTextColor = White,
-                    focusedBorderColor = Blue,
-                    unfocusedBorderColor = Muted,
-                    focusedLabelColor = Blue,
-                    unfocusedLabelColor = Muted
-                )
-            )
-
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = {
-                    if (!date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
-                        message = "Wpisz datę w formacie RRRR-MM-DD."
-                    } else {
-                        loading = true
-                        message = "Pobieranie danych z kilku źródeł..."
-                        matches = emptyList()
-                        onLoad(date) { result, status ->
-                            matches = result
-                            message = status
-                            loading = false
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading,
-                colors = ButtonDefaults.buttonColors(containerColor = Blue)
-            ) {
-                Text(
-                    if (loading) "POBIERANIE..." else "POBIERZ MECZE",
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            Text(message, color = Muted, fontSize = 13.sp)
             Spacer(Modifier.height(18.dp))
 
-            matches.forEach { match ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Panel),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(Modifier.padding(15.dp)) {
-                        Text(
-                            match.league,
-                            color = Blue,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            match.home,
-                            color = White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            match.score,
-                            color = Blue,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            match.away,
-                            color = White,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "${match.time}  •  ${match.source}",
-                            color = Muted,
-                            fontSize = 11.sp
-                        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("MECZE", "TOP", "ANALIZA", "HISTORIA").forEach { item ->
+                    Button(
+                        onClick = { screen = item },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (screen == item) Blue else Panel
+                        ),
+                        contentPadding = PaddingValues(
+                            horizontal = 9.dp,
+                            vertical = 8.dp
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(item, fontSize = 9.sp)
                     }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
+
+            when (screen) {
+                "MECZE" -> {
+                    Text("WYBIERZ ROZGRYWKI", color = Muted, fontSize = 12.sp)
+
+                    Box {
+                        Button(
+                            onClick = { expanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Panel
+                            )
+                        ) {
+                            Text(
+                                selectedLeague?.name ?: "Wybierz ligę",
+                                color = White
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.heightIn(max = 400.dp)
+                        ) {
+                            leagues.forEach { league ->
+                                DropdownMenuItem(
+                                    text = { Text(league.name) },
+                                    onClick = {
+                                        selectedLeague = league
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("DATA MECZÓW (RRRR-MM-DD)", color = Muted, fontSize = 12.sp)
+
+                    OutlinedTextField(
+                        value = date,
+                        onValueChange = { date = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = White,
+                            unfocusedTextColor = White,
+                            focusedBorderColor = Blue,
+                            unfocusedBorderColor = Muted
+                        )
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            val league = selectedLeague
+                            if (league != null &&
+                                date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+                                loading = true
+                                status = "Pobieranie spotkań..."
+                                loadMatches(league, date) { result, message ->
+                                    matches = result
+                                    status = message
+                                    loading = false
+                                }
+                            } else {
+                                status = "Wybierz ligę i poprawną datę."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Blue
+                        )
+                    ) {
+                        Text("POBIERZ MECZE", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text(status, color = Muted, fontSize = 12.sp)
+
+                    if (loading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Blue
+                        )
+                    }
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(matches) { match ->
+                            MatchCard(
+                                match = match,
+                                onClick = {
+                                    selectedMatch = match
+                                    screen = "ANALIZA"
+                                }
+                            )
+                        }
+                    }
+                }
+
+                "TOP" -> {
+                    Text("NAJCIEKAWSZE SPOTKANIA", color = White,
+                        fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Lista spotkań z aktualnie pobranej daty. " +
+                            "Ranking jakościowy zostanie oparty na danych statystycznych.",
+                        color = Muted,
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    LazyColumn {
+                        items(matches.take(10)) { match ->
+                            MatchCard(match) {
+                                selectedMatch = match
+                                screen = "ANALIZA"
+                            }
+                        }
+                    }
+                }
+
+                "ANALIZA" -> {
+                    Text("ANALIZA MECZU", color = White,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(14.dp))
+
+                    if (selectedMatch == null) {
+                        Text("Wybierz mecz z listy, aby otworzyć analizę.",
+                            color = Muted)
+                    } else {
+                        val match = selectedMatch!!
+                        Text(
+                            "${match.home}  —  ${match.away}",
+                            color = White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(match.league, color = Blue)
+                        Text("Wynik: ${match.score}", color = White)
+                        Spacer(Modifier.height(16.dp))
+                        Text("DANE I PROGNOZY", color = Blue,
+                            fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Źródło danych: ${match.source}\n" +
+                                "Data spotkania: ${match.date}\n\n" +
+                                "Prawdopodobieństwa 1X2, BTTS i Over/Under " +
+                                "zostaną wyliczone po zebraniu wiarygodnych " +
+                                "statystyk obu drużyn. Nie podajemy fikcyjnych procentów.",
+                            color = White
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                if (!history.contains(match)) {
+                                    history = history + match
+                                }
+                                status = "Analiza zapisana w historii."
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Blue
+                            )
+                        ) {
+                            Text("ZAPISZ W HISTORII")
+                        }
+                        Text(status, color = Muted)
+                    }
+                }
+
+                "HISTORIA" -> {
+                    Text("ZAPISANE ANALIZY", color = White,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    if (history.isEmpty()) {
+                        Text("Nie zapisano jeszcze żadnych analiz.",
+                            color = Muted)
+                    } else {
+                        LazyColumn {
+                            items(history) { match ->
+                                MatchCard(match) {
+                                    selectedMatch = match
+                                    screen = "ANALIZA"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
             Text(
-                "DANE ZEWNĘTRZNE • WYNIKI MOGĄ BYĆ NIEPEŁNE",
+                "FOOTBALL AI PRO 2.0  •  DANE STATYSTYCZNE",
                 color = Muted,
-                fontSize = 10.sp
+                fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
         }
     }
 }
 
-private fun download(address: String): String {
-    val connection = URL(address).openConnection() as HttpURLConnection
-    try {
-        connection.requestMethod = "GET"
-        connection.connectTimeout = 12000
-        connection.readTimeout = 12000
-        connection.setRequestProperty("Accept", "application/json")
-
-        if (connection.responseCode !in 200..299) {
-            throw Exception("HTTP ${connection.responseCode}")
+@Composable
+fun MatchCard(
+    match: FootballMatch,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(14.dp)
+    ) {
+        Text(match.league, color = Blue, fontSize = 11.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            match.home,
+            color = White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+        Text(
+            match.away,
+            color = White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp
+        )
+        Spacer(Modifier.height(7.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Wynik: ${match.score}", color = White, fontSize = 13.sp)
+            Text("ANALIZUJ  ›", color = Blue, fontSize = 12.sp)
         }
-
-        return connection.inputStream.bufferedReader().use {
-            it.readText()
-        }
-    } finally {
-        connection.disconnect()
+        Text("Źródło: ${match.source}", color = Muted, fontSize = 10.sp)
     }
 }
