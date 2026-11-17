@@ -1030,35 +1030,45 @@ fun FootballApp(
     }
 }
 
-// Tworzy statystyki drużyny z wcześniejszych, zakończonych meczów.
+// Tworzy sumy i podział dom/wyjazd z wcześniejszych zakończonych meczów.
 private fun buildTeamStats(
     team: String,
     matches: List<FootballMatch>
 ): TeamStats? {
     var played = 0
-    var goalsScored = 0
-    var goalsConceded = 0
+    var scoredTotal = 0
+    var concededTotal = 0
+    var homePlayed = 0
+    var homeScored = 0
+    var homeConceded = 0
+    var awayPlayed = 0
+    var awayScored = 0
+    var awayConceded = 0
     var wins = 0
     var draws = 0
     var losses = 0
 
     for (match in matches) {
-        val score = match.score.split(":")
-        if (score.size != 2) continue
-
-        val first = score[0].trim().toIntOrNull() ?: continue
-        val second = score[1].trim().toIntOrNull() ?: continue
-
+        val score = FootballScoreParser.parse(match.score) ?: continue
         val isHome = match.home == team
         val isAway = match.away == team
         if (!isHome && !isAway) continue
 
-        val scored = if (isHome) first else second
-        val conceded = if (isHome) second else first
-
+        val scored = if (isHome) score.home else score.away
+        val conceded = if (isHome) score.away else score.home
         played++
-        goalsScored += scored
-        goalsConceded += conceded
+        scoredTotal += scored
+        concededTotal += conceded
+
+        if (isHome) {
+            homePlayed++
+            homeScored += scored
+            homeConceded += conceded
+        } else {
+            awayPlayed++
+            awayScored += scored
+            awayConceded += conceded
+        }
 
         when {
             scored > conceded -> wins++
@@ -1072,11 +1082,17 @@ private fun buildTeamStats(
     return TeamStats(
         teamName = team,
         matchesPlayed = played,
-        goalsScored = goalsScored.toDouble() / played,
-        goalsConceded = goalsConceded.toDouble() / played,
+        goalsScored = scoredTotal.toDouble(),
+        goalsConceded = concededTotal.toDouble(),
         wins = wins,
         draws = draws,
-        losses = losses
+        losses = losses,
+        homeMatchesPlayed = homePlayed,
+        homeGoalsScored = if (homePlayed > 0) homeScored.toDouble() else null,
+        homeGoalsConceded = if (homePlayed > 0) homeConceded.toDouble() else null,
+        awayMatchesPlayed = awayPlayed,
+        awayGoalsScored = if (awayPlayed > 0) awayScored.toDouble() else null,
+        awayGoalsConceded = if (awayPlayed > 0) awayConceded.toDouble() else null
     )
 }
 
