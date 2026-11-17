@@ -780,7 +780,11 @@ fun FootballApp(
                                     fontSize = 11.sp
                                 )
 
-                                val markets = listOf("1", "X", "2", "Over 2.5", "BTTS")
+                                val markets = listOf(
+                                    "1", "X", "2",
+                                    "Over 1.5", "Over 2.5", "Over 3.5",
+                                    "Under 2.5", "BTTS", "BTTS No"
+                                )
 
                                 markets.chunked(3).forEach { rowMarkets ->
                                     Row(
@@ -838,8 +842,12 @@ fun FootballApp(
                                     "1" -> result.homeWin
                                     "X" -> result.draw
                                     "2" -> result.awayWin
+                                    "Over 1.5" -> result.over15
                                     "Over 2.5" -> result.over25
+                                    "Over 3.5" -> result.over35
+                                    "Under 2.5" -> result.under25
                                     "BTTS" -> result.bttsYes
+                                    "BTTS No" -> result.bttsNo
                                     else -> 0.0
                                 }
 
@@ -933,8 +941,12 @@ fun FootballApp(
                                                 "1" -> PredictionPerformance.HOME_WIN
                                                 "X" -> PredictionPerformance.DRAW
                                                 "2" -> PredictionPerformance.AWAY_WIN
+                                                "Over 1.5" -> PredictionPerformance.OVER_15
                                                 "Over 2.5" -> PredictionPerformance.OVER_25
+                                                "Over 3.5" -> PredictionPerformance.OVER_35
+                                                "Under 2.5" -> PredictionPerformance.UNDER_25
                                                 "BTTS" -> PredictionPerformance.BTTS_YES
+                                                "BTTS No" -> PredictionPerformance.BTTS_NO
                                                 else -> null
                                             }
 
