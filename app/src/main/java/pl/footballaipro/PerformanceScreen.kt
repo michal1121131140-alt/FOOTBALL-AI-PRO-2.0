@@ -1,0 +1,228 @@
+
+package pl.footballaipro
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import java.util.Locale
+
+@Composable
+fun PerformanceScreen() {
+    val context = LocalContext.current
+
+    val records = remember {
+        mutableStateOf(PredictionPerformance.getAll(context))
+    }
+
+    val stats = remember(records.value) {
+        PredictionPerformance.getStats(context)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "SKUTECZNOŚĆ PRO",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                records.value = PredictionPerformance.getAll(context)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("ODŚWIEŻ STATYSTYKI")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard(
+                title = "Wszystkie typy",
+                value = stats.total.toString(),
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                title = "Oczekujące",
+                value = stats.open.toString(),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard(
+                title = "Wygrane",
+                value = stats.wins.toString(),
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                title = "Przegrane",
+                value = stats.losses.toString(),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard(
+                title = "Skuteczność",
+                value = format(stats.winRate) + "%",
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                title = "ROI",
+                value = format(stats.roi) + "%",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Bilans finansowy",
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Stawki rozliczone: ${format(stats.totalStake)}")
+                Text(
+                    text = "Zysk / strata: ${format(stats.totalProfit)}",
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Rozliczone typy: ${stats.settled}")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "HISTORIA TYPÓW",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (records.value.isEmpty()) {
+            Text("Nie zapisano jeszcze żadnych typów.")
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = records.value.sortedByDescending { it.createdAt },
+                    key = { it.id }
+                ) { record ->
+                    PredictionRecordCard(record)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun PredictionRecordCard(record: PredictionRecord) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "${record.home} - ${record.away}",
+                fontWeight = FontWeight.Bold
+            )
+            Text("Liga: ${record.league}")
+            Text("Rynek: ${record.market}")
+            Text("Typ: ${record.selection}")
+            Text("Kurs: ${format(record.odds)}")
+            Text("Stawka: ${format(record.stake)}")
+            Text("Prawdopodobieństwo modelu: ${format(record.probability)}%")
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val status = when {
+                !record.settled -> "OCZEKUJE NA WYNIK"
+                record.won == true -> "WYGRANY"
+                else -> "PRZEGRANY"
+            }
+
+            Text(
+                text = status,
+                fontWeight = FontWeight.Bold,
+                color = when {
+                    !record.settled -> MaterialTheme.colorScheme.primary
+                    record.won == true -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.error
+                }
+            )
+
+            if (record.settled) {
+                Text("Wynik: ${record.actualScore}")
+                Text("Bilans: ${format(record.profit)}")
+            }
+        }
+    }
+}
+
+private fun format(value: Double): String =
+    String.format(Locale("pl", "PL"), "%.2f", value)
