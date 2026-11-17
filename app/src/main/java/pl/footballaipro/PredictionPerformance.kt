@@ -119,11 +119,9 @@ object PredictionPerformance {
         context: Context,
         match: FootballMatch
     ): Int {
-        val score = Regex("""(\d+)\s*[:\-]\s*(\d+)""")
-            .find(match.score) ?: return 0
-
-        val homeGoals = score.groupValues[1].toIntOrNull() ?: return 0
-        val awayGoals = score.groupValues[2].toIntOrNull() ?: return 0
+        val score = FootballScoreParser.parse(match.score) ?: return 0
+        val homeGoals = score.home
+        val awayGoals = score.away
 
         val records = getAll(context).toMutableList()
         var settledCount = 0
