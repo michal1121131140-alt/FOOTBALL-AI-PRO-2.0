@@ -18,14 +18,19 @@ object FootballDataRepository {
         var conceded: Double = 0.0,
         var wins: Int = 0,
         var draws: Int = 0,
-        var losses: Int = 0
+        var losses: Int = 0,
+        var homePlayed: Int = 0,
+        var homeScored: Double = 0.0,
+        var homeConceded: Double = 0.0,
+        var awayPlayed: Int = 0,
+        var awayScored: Double = 0.0,
+        var awayConceded: Double = 0.0
     )
 
     fun fetchTeamStats(
         league: FootballLeague,
         match: FootballMatch
     ): TeamAnalysisData {
-
         val url = URL(
             "https://api.openligadb.de/getmatchdata/" +
                 "${league.shortcut}/${league.season}"
@@ -35,11 +40,10 @@ object FootballDataRepository {
         connection.connectTimeout = 15000
         connection.readTimeout = 15000
         connection.requestMethod = "GET"
+        connection.setRequestProperty("User-Agent", "FootballAIPro/2.0")
 
         val json = try {
-            connection.inputStream.bufferedReader().use {
-                it.readText()
-            }
+            connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }
@@ -48,49 +52,53 @@ object FootballDataRepository {
         val records = mutableMapOf<String, TeamRecord>()
 
         for (i in 0 until array.length()) {
-            val item = array.getJSONObject(i)
-
+            val item = array.optJSONObject(i) ?: continue
             val matchDate = item.optString("matchDateTime").take(10)
 
-            // Korzystamy tylko z meczów rozegranych przed analizowanym spotkaniem.
-            if (matchDate >= match.date) continue
+            // Do not leak the result of the match being predicted (or future matches)
+            // into the model's historical sample.
+            if (matchDate.isBlank() || matchDate >= match.date) continue
 
-            val team1 = item.optJSONObject("team1") ?: continue
-            val team2 = item.optJSONObject("team2") ?: continue
-
-            val home = team1.optString("teamName")
-            val away = team2.optString("teamName")
-
+            val home = item.optJSONObject("team1")
+                ?.optString("teamName").orEmpty()
+            val away = item.optJSONObject("team2")
+                ?.optString("teamName").orEmpty()
             if (home.isBlank() || away.isBlank()) continue
 
             val results = item.optJSONArray("matchResults") ?: continue
             val finalResult = findFinalResult(results) ?: continue
+            if (!finalResult.has("pointsTeam1") ||
+                !finalResult.has("pointsTeam2")) continue
 
-            val goals1 = finalResult.optInt("pointsTeam1")
-            val goals2 = finalResult.optInt("pointsTeam2")
+            val goalsHome = finalResult.optInt("pointsTeam1")
+            val goalsAway = finalResult.optInt("pointsTeam2")
 
             val homeRecord = records.getOrPut(home) { TeamRecord() }
             val awayRecord = records.getOrPut(away) { TeamRecord() }
 
             homeRecord.played++
-            homeRecord.scored += goals1
-            homeRecord.conceded += goals2
+            homeRecord.scored += goalsHome
+            homeRecord.conceded += goalsAway
+            homeRecord.homePlayed++
+            homeRecord.homeScored += goalsHome
+            homeRecord.homeConceded += goalsAway
 
             awayRecord.played++
-            awayRecord.scored += goals2
-            awayRecord.conceded += goals1
+            awayRecord.scored += goalsAway
+            awayRecord.conceded += goalsHome
+            awayRecord.awayPlayed++
+            awayRecord.awayScored += goalsAway
+            awayRecord.awayConceded += goalsHome
 
             when {
-                goals1 > goals2 -> {
+                goalsHome > goalsAway -> {
                     homeRecord.wins++
                     awayRecord.losses++
                 }
-
-                goals1 < goals2 -> {
+                goalsHome < goalsAway -> {
                     awayRecord.wins++
                     homeRecord.losses++
                 }
-
                 else -> {
                     homeRecord.draws++
                     awayRecord.draws++
@@ -98,33 +106,24 @@ object FootballDataRepository {
             }
         }
 
-        val homeRecord = records[match.home] ?: TeamRecord()
-        val awayRecord = records[match.away] ?: TeamRecord()
-
         return TeamAnalysisData(
-            home = homeRecord.toTeamStats(match.home),
-            away = awayRecord.toTeamStats(match.away)
+            home = (records[match.home] ?: TeamRecord()).toTeamStats(match.home),
+            away = (records[match.away] ?: TeamRecord()).toTeamStats(match.away)
         )
     }
 
-    private fun findFinalResult(
-        results: JSONArray
-    ): JSONObject? {
+    private fun findFinalResult(results: JSONArray): JSONObject? {
         for (i in 0 until results.length()) {
             val result = results.optJSONObject(i) ?: continue
-
             if (result.optString("resultName")
                     .contains("Endergebnis", ignoreCase = true)) {
                 return result
             }
         }
-
         return null
     }
 
-    private fun TeamRecord.toTeamStats(
-        name: String
-    ): TeamStats {
+    private fun TeamRecord.toTeamStats(name: String): TeamStats {
         return TeamStats(
             teamName = name,
             matchesPlayed = played,
@@ -132,7 +131,13 @@ object FootballDataRepository {
             goalsConceded = conceded,
             wins = wins,
             draws = draws,
-            losses = losses
+            losses = losses,
+            homeMatchesPlayed = homePlayed,
+            homeGoalsScored = if (homePlayed > 0) homeScored else null,
+            homeGoalsConceded = if (homePlayed > 0) homeConceded else null,
+            awayMatchesPlayed = awayPlayed,
+            awayGoalsScored = if (awayPlayed > 0) awayScored else null,
+            awayGoalsConceded = if (awayPlayed > 0) awayConceded else null
         )
     }
 }
