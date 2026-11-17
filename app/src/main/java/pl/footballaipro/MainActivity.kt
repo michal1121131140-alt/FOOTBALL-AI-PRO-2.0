@@ -311,7 +311,8 @@ fun FootballApp(
         }.toMap()
 
         DailyMatchRanker.rank(
-            matches = matches,
+            // TOP ma prezentować tylko spotkania, które nie mają jeszcze wyniku końcowego.
+            matches = matches.filter { FootballScoreParser.parse(it.score) == null },
             formByTeam = formByTeam,
             predictions = predictions,
             limit = 10
@@ -546,6 +547,26 @@ fun FootballApp(
                                     color = Muted,
                                     fontSize = 11.sp
                                 )
+                                if (ranked.recommendedMarket != "BRAK REKOMENDACJI") {
+                                    Text(
+                                        "SUGEROWANY RYNEK: ${ranked.recommendedMarket} " +
+                                            "(${"%.1f".format(Locale.US, ranked.recommendedProbability)}%)",
+                                        color = Green,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        "Ocena ryzyka: ${ranked.riskLabel}",
+                                        color = Muted,
+                                        fontSize = 10.sp
+                                    )
+                                } else {
+                                    Text(
+                                        "Brak rekomendacji — za mało wiarygodnych danych.",
+                                        color = Red,
+                                        fontSize = 11.sp
+                                    )
+                                }
                                 Text(
                                     ranked.explanation,
                                     color = Muted,
@@ -748,7 +769,8 @@ fun FootballApp(
                                         "Obie drużyny strzelą: ${"%.1f".format(Locale.US, result.bttsYes)}%\n" +
                                         "Nie strzelą obie: ${"%.1f".format(Locale.US, result.bttsNo)}%\n\n" +
                                         "Oczekiwane gole gospodarzy: ${"%.2f".format(Locale.US, result.expectedHomeGoals)}\n" +
-                                        "Oczekiwane gole gości: ${"%.2f".format(Locale.US, result.expectedAwayGoals)}"
+                                        "Oczekiwane gole gości: ${"%.2f".format(Locale.US, result.expectedAwayGoals)}\n\n" +
+                                        "Wiarygodność danych: ${"%.0f".format(Locale.US, result.dataReliability)}%"
                                 )
 
                                 SectionTitle("VALUE BETTING")
