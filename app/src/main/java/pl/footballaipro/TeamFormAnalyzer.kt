@@ -1,4 +1,3 @@
-
 package pl.footballaipro
 
 data class TeamForm(
@@ -19,11 +18,10 @@ object TeamFormAnalyzer {
         matches: List<FootballMatch>,
         limit: Int = 5
     ): TeamForm {
-
         val completed = matches
             .filter {
                 (it.home == teamName || it.away == teamName) &&
-                it.score.contains("-")
+                    FootballScoreParser.parse(it.score) != null
             }
             .sortedByDescending { it.date }
             .take(limit)
@@ -33,23 +31,17 @@ object TeamFormAnalyzer {
         var losses = 0
 
         val results = completed.mapNotNull { match ->
-            val goals = match.score.split("-", ":", "–")
-            if (goals.size < 2) return@mapNotNull null
-
-            val homeGoals = goals[0].trim().toIntOrNull()
+            val score = FootballScoreParser.parse(match.score)
                 ?: return@mapNotNull null
-            val awayGoals = goals[1].trim().toIntOrNull()
-                ?: return@mapNotNull null
-
             val isHome = match.home == teamName
 
-            val result = when {
-                homeGoals == awayGoals -> {
+            when {
+                score.home == score.away -> {
                     draws++
                     "R"
                 }
-                (isHome && homeGoals > awayGoals) ||
-                (!isHome && awayGoals > homeGoals) -> {
+                (isHome && score.home > score.away) ||
+                    (!isHome && score.away > score.home) -> {
                     wins++
                     "W"
                 }
@@ -58,20 +50,13 @@ object TeamFormAnalyzer {
                     "P"
                 }
             }
-
-            result
         }
 
         val points = wins * 3 + draws
-        val rating = if (completed.isEmpty()) {
-            0.0
-        } else {
-            points.toDouble() / (completed.size * 3) * 100.0
-        }
-
+        val rating = if (results.isEmpty()) 0.0
+            else points.toDouble() / (results.size * 3) * 100.0
         val streak = results.firstOrNull()?.let { first ->
-            val count = results.takeWhile { it == first }.size
-            "$count × $first"
+            "${results.takeWhile { it == first }.size} × $first"
         } ?: "Brak danych"
 
         return TeamForm(
