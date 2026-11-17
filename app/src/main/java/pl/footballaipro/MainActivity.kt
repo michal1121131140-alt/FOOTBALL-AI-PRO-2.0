@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -166,24 +167,22 @@ class MainActivity : ComponentActivity() {
                     var score = "Nie rozegrano"
 
                     if (results != null && results.length() > 0) {
-                        var chosen: JSONObject? = null
+                        var finalResult: JSONObject? = null
 
                         for (j in 0 until results.length()) {
                             val result = results.getJSONObject(j)
                             if (result.optString("resultName")
                                     .contains("Endergebnis", true)
                             ) {
-                                chosen = result
+                                finalResult = result
                                 break
                             }
                         }
 
-                        if (chosen == null) {
-                            chosen = results.getJSONObject(results.length() - 1)
+                        if (finalResult != null) {
+                            score = "${finalResult.optInt("pointsTeam1")} : " +
+                                "${finalResult.optInt("pointsTeam2")}"
                         }
-
-                        score = "${chosen.optInt("pointsTeam1")} : " +
-                            "${chosen.optInt("pointsTeam2")}"
                     }
 
                     allMatches.add(
@@ -266,6 +265,7 @@ fun FootballApp(
     var analysisLoading by remember { mutableStateOf(false) }
 
     var oddsInput by remember { mutableStateOf("") }
+    var stakeInput by remember { mutableStateOf("1.00") }
     var selectedMarket by remember { mutableStateOf("1") }
     var oddsAnalysis by remember { mutableStateOf<OddsAnalysis?>(null) }
 
@@ -292,7 +292,6 @@ fun FootballApp(
             }
     }
 
-    // Prognozy dla TOP są wyliczane z wcześniejszych rozegranych spotkań.
     val rankedMatches = remember(matches, seasonMatches, formByTeam) {
         val predictions = matches.mapNotNull { match ->
             val previous = seasonMatches.filter { it.date < match.date }
@@ -344,25 +343,32 @@ fun FootballApp(
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
             ) {
-                listOf("MECZE", "TOP", "TABELA", "ANALIZA", "HISTORIA")
-                    .forEach { item ->
-                        Button(
-                            onClick = { screen = item },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(
-                                horizontal = 1.dp,
-                                vertical = 8.dp
-                            ),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor =
-                                    if (screen == item) Blue else Panel
-                            )
-                        ) {
-                            Text(item, fontSize = 8.sp)
-                        }
+                listOf(
+                    "MECZE",
+                    "TOP",
+                    "TABELA",
+                    "ANALIZA",
+                    "HISTORIA",
+                    "STATYSTYKI"
+                ).forEach { item ->
+                    Button(
+                        onClick = { screen = item },
+                        contentPadding = PaddingValues(
+                            horizontal = 9.dp,
+                            vertical = 8.dp
+                        ),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor =
+                                if (screen == item) Blue else Panel
+                        )
+                    ) {
+                        Text(item, fontSize = 9.sp)
                     }
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -426,7 +432,19 @@ fun FootballApp(
                                 loadMatches(league, date) { result, all, message ->
                                     matches = result
                                     seasonMatches = all
-                                    status = message
+
+                                    var settledCount = 0
+                                    all.forEach { match ->
+                                        settledCount +=
+                                            PredictionPerformance.settleMatch(context, match)
+                                    }
+
+                                    status = if (settledCount > 0) {
+                                        "$message Rozliczono typów: $settledCount."
+                                    } else {
+                                        message
+                                    }
+
                                     loading = false
                                 }
                             } else {
@@ -782,6 +800,18 @@ fun FootballApp(
                                     )
                                 )
 
+                                OutlinedTextField(
+                                    value = stakeInput,
+                                    onValueChange = { stakeInput = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Stawka") },
+                                    placeholder = { Text("np. 10,00") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal
+                                    )
+                                )
+
                                 val marketProbability = when (selectedMarket) {
                                     "1" -> result.homeWin
                                     "X" -> result.draw
@@ -813,7 +843,8 @@ fun FootballApp(
                                                 status = "Obliczono analizę Value Betting."
                                             } catch (e: Exception) {
                                                 oddsAnalysis = null
-                                                status = e.message ?: "Nie udało się obliczyć kursu."
+                                                status = e.message
+                                                    ?: "Nie udało się obliczyć kursu."
                                             }
                                         }
                                     },
@@ -866,10 +897,66 @@ fun FootballApp(
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
+
+                                    Button(
+                                        onClick = {
+                                            val odds = oddsInput
+                                                .replace(",", ".")
+                                                .toDoubleOrNull()
+                                            val stake = stakeInput
+                                                .replace(",", ".")
+                                                .toDoubleOrNull()
+
+                                            val selection = when (selectedMarket) {
+                                                "1" -> PredictionPerformance.HOME_WIN
+                                                "X" -> PredictionPerformance.DRAW
+                                                "2" -> PredictionPerformance.AWAY_WIN
+                                                "Over 2.5" -> PredictionPerformance.OVER_25
+                                                "BTTS" -> PredictionPerformance.BTTS_YES
+                                                else -> null
+                                            }
+
+                                            if (odds == null || odds <= 1.0 ||
+                                                stake == null || stake <= 0.0 ||
+                                                selection == null
+                                            ) {
+                                                status = "Sprawdź kurs i stawkę."
+                                            } else {
+                                                try {
+                                                    val record =
+                                                        PredictionPerformance.createRecord(
+                                                            match = match,
+                                                            selection = selection,
+                                                            odds = odds,
+                                                            probability = marketProbability,
+                                                            stake = stake
+                                                        )
+
+                                                    PredictionPerformance.save(
+                                                        context,
+                                                        record
+                                                    )
+
+                                                    status = "Typ zapisany do rozliczenia."
+                                                } catch (e: Exception) {
+                                                    status = e.message
+                                                        ?: "Nie udało się zapisać typu."
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Green
+                                        )
+                                    ) {
+                                        Text("ZAPISZ TYP DO ROZLICZENIA")
+                                    }
                                 }
 
                                 Text(
-                                    "Model statystyczny nie gwarantuje wyniku. Value Betting jest wyliczeniem matematycznym, a nie pewnym sposobem zarabiania.",
+                                    "Model statystyczny nie gwarantuje wyniku. " +
+                                        "Value Betting jest wyliczeniem matematycznym, " +
+                                        "a nie pewnym sposobem zarabiania.",
                                     color = Muted,
                                     fontSize = 11.sp
                                 )
@@ -933,6 +1020,10 @@ fun FootballApp(
                     if (history.isEmpty()) {
                         Text("Historia jest pusta.", color = Muted)
                     }
+                }
+
+                "STATYSTYKI" -> {
+                    PerformanceScreen()
                 }
             }
         }
