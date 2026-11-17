@@ -1,5 +1,6 @@
 package pl.footballaipro
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FootballApp(
+                context = this,
                 loadLeagues = { callback ->
                     fetchLeagues(callback)
                 },
@@ -138,9 +141,7 @@ class MainActivity : ComponentActivity() {
 
                 for (i in 0 until array.length()) {
                     val item = array.getJSONObject(i)
-
-                    val date = item.optString("matchDateTime")
-                        .take(10)
+                    val date = item.optString("matchDateTime").take(10)
 
                     if (date != selectedDate) continue
 
@@ -207,6 +208,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FootballApp(
+    context: Context,
     loadLeagues: ((List<FootballLeague>, String) -> Unit) -> Unit,
     loadMatches: (
         FootballLeague,
@@ -218,14 +220,22 @@ fun FootballApp(
     var matches by remember { mutableStateOf(emptyList<FootballMatch>()) }
     var selectedLeague by remember { mutableStateOf<FootballLeague?>(null) }
     var selectedMatch by remember { mutableStateOf<FootballMatch?>(null) }
+
+    val history by FootballStorage.getHistory(context)
+        .collectAsState(initial = emptyList())
+
+    val scope = rememberCoroutineScope()
+
     var date by remember {
-        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()))
+        mutableStateOf(
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        )
     }
+
     var status by remember { mutableStateOf("Ładowanie dostępnych lig...") }
     var expanded by remember { mutableStateOf(false) }
     var screen by remember { mutableStateOf("MECZE") }
     var loading by remember { mutableStateOf(false) }
-    var history by remember { mutableStateOf(emptyList<FootballMatch>()) }
 
     LaunchedEffect(Unit) {
         loadLeagues { result, message ->
@@ -248,6 +258,7 @@ fun FootballApp(
                 fontSize = 27.sp,
                 fontWeight = FontWeight.ExtraBold
             )
+
             Text(
                 "PRO 2.0  •  ANALIZA PIŁKARSKA",
                 color = Blue,
@@ -340,6 +351,7 @@ fun FootballApp(
                                 date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
                                 loading = true
                                 status = "Pobieranie spotkań..."
+
                                 loadMatches(league, date) { result, message ->
                                     matches = result
                                     status = message
@@ -372,27 +384,31 @@ fun FootballApp(
                         modifier = Modifier.weight(1f)
                     ) {
                         items(matches) { match ->
-                            MatchCard(
-                                match = match,
-                                onClick = {
-                                    selectedMatch = match
-                                    screen = "ANALIZA"
-                                }
-                            )
+                            MatchCard(match) {
+                                selectedMatch = match
+                                screen = "ANALIZA"
+                            }
                         }
                     }
                 }
 
                 "TOP" -> {
-                    Text("NAJCIEKAWSZE SPOTKANIA", color = White,
-                        fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Lista spotkań z aktualnie pobranej daty. " +
-                            "Ranking jakościowy zostanie oparty na danych statystycznych.",
+                        "NAJCIEKAWSZE SPOTKANIA",
+                        color = White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        "Spotkania z aktualnie pobranej daty. Ranking będzie " +
+                            "oparty na rzeczywistych statystykach.",
                         color = Muted,
                         fontSize = 12.sp
                     )
+
                     Spacer(Modifier.height(12.dp))
+
                     LazyColumn {
                         items(matches.take(10)) { match ->
                             MatchCard(match) {
@@ -404,42 +420,61 @@ fun FootballApp(
                 }
 
                 "ANALIZA" -> {
-                    Text("ANALIZA MECZU", color = White,
-                        fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "ANALIZA MECZU",
+                        color = White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
                     Spacer(Modifier.height(14.dp))
 
                     if (selectedMatch == null) {
-                        Text("Wybierz mecz z listy, aby otworzyć analizę.",
-                            color = Muted)
+                        Text(
+                            "Wybierz mecz z listy, aby otworzyć analizę.",
+                            color = Muted
+                        )
                     } else {
                         val match = selectedMatch!!
+
                         Text(
-                            "${match.home}  —  ${match.away}",
+                            "${match.home} — ${match.away}",
                             color = White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
+
                         Text(match.league, color = Blue)
                         Text("Wynik: ${match.score}", color = White)
+
                         Spacer(Modifier.height(16.dp))
-                        Text("DANE I PROGNOZY", color = Blue,
-                            fontWeight = FontWeight.Bold)
+
+                        Text(
+                            "DANE I PROGNOZY",
+                            color = Blue,
+                            fontWeight = FontWeight.Bold
+                        )
+
                         Spacer(Modifier.height(8.dp))
+
                         Text(
                             "Źródło danych: ${match.source}\n" +
                                 "Data spotkania: ${match.date}\n\n" +
-                                "Prawdopodobieństwa 1X2, BTTS i Over/Under " +
-                                "zostaną wyliczone po zebraniu wiarygodnych " +
-                                "statystyk obu drużyn. Nie podajemy fikcyjnych procentów.",
+                                "Prognozy 1X2, BTTS i Over/Under wymagają " +
+                                "danych statystycznych obu drużyn. Nie " +
+                                "podajemy fikcyjnych procentów.",
                             color = White
                         )
+
                         Spacer(Modifier.height(16.dp))
+
                         Button(
                             onClick = {
-                                if (!history.contains(match)) {
-                                    history = history + match
+                                scope.launch {
+                                    val updated = (history + match).distinct()
+                                    FootballStorage.saveHistory(context, updated)
+                                    status = "Analiza zapisana w historii."
                                 }
-                                status = "Analiza zapisana w historii."
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Blue
@@ -447,17 +482,26 @@ fun FootballApp(
                         ) {
                             Text("ZAPISZ W HISTORII")
                         }
+
                         Text(status, color = Muted)
                     }
                 }
 
                 "HISTORIA" -> {
-                    Text("ZAPISANE ANALIZY", color = White,
-                        fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "ZAPISANE ANALIZY",
+                        color = White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
                     Spacer(Modifier.height(12.dp))
+
                     if (history.isEmpty()) {
-                        Text("Nie zapisano jeszcze żadnych analiz.",
-                            color = Muted)
+                        Text(
+                            "Nie zapisano jeszcze żadnych analiz.",
+                            color = Muted
+                        )
                     } else {
                         LazyColumn {
                             items(history) { match ->
@@ -472,6 +516,7 @@ fun FootballApp(
             }
 
             Spacer(Modifier.height(8.dp))
+
             Text(
                 "FOOTBALL AI PRO 2.0  •  DANE STATYSTYCZNE",
                 color = Muted,
@@ -496,19 +541,23 @@ fun MatchCard(
     ) {
         Text(match.league, color = Blue, fontSize = 11.sp)
         Spacer(Modifier.height(6.dp))
+
         Text(
             match.home,
             color = White,
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp
         )
+
         Text(
             match.away,
             color = White,
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp
         )
+
         Spacer(Modifier.height(7.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -516,6 +565,7 @@ fun MatchCard(
             Text("Wynik: ${match.score}", color = White, fontSize = 13.sp)
             Text("ANALIZUJ  ›", color = Blue, fontSize = 12.sp)
         }
+
         Text("Źródło: ${match.source}", color = Muted, fontSize = 10.sp)
     }
 }
