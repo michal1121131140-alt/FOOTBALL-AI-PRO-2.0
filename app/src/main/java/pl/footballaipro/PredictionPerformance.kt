@@ -19,7 +19,8 @@ data class PredictionRecord(
     val settled: Boolean = false,
     val won: Boolean? = null,
     val profit: Double = 0.0,
-    val actualScore: String = ""
+    val actualScore: String = "",
+    val matchDate: String = ""
 )
 
 data class PerformanceStats(
@@ -76,7 +77,8 @@ object PredictionPerformance {
                     won = if (item.isNull("won")) null
                           else item.optBoolean("won"),
                     profit = item.optDouble("profit"),
-                    actualScore = item.optString("actualScore")
+                    actualScore = item.optString("actualScore"),
+                    matchDate = item.optString("matchDate")
                 )
             )
         }
@@ -111,7 +113,8 @@ object PredictionPerformance {
             odds = odds,
             probability = probability,
             stake = stake,
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            matchDate = match.date
         )
     }
 
@@ -132,7 +135,8 @@ object PredictionPerformance {
             if (record.settled ||
                 !record.home.equals(match.home, true) ||
                 !record.away.equals(match.away, true) ||
-                !record.league.equals(match.league, true)
+                !record.league.equals(match.league, true) ||
+                (record.matchDate.isNotBlank() && record.matchDate != match.date)
             ) continue
 
             val won = evaluate(
@@ -233,6 +237,7 @@ object PredictionPerformance {
                 put("won", record.won ?: JSONObject.NULL)
                 put("profit", record.profit)
                 put("actualScore", record.actualScore)
+                put("matchDate", record.matchDate)
             }
             array.put(item)
         }
