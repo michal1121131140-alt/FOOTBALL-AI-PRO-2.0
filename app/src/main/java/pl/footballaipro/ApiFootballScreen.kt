@@ -56,6 +56,23 @@ fun ApiFootballScreen(
         date = selectedDate
     }
 
+    var fixtures by remember { mutableStateOf(emptyList<ApiFootballFixture>()) }
+    var selected by remember { mutableStateOf<ApiFootballFixture?>(null) }
+    var research by remember { mutableStateOf<FixtureResearch?>(null) }
+    var status by remember { mutableStateOf("Wpisz klucz API-Football i pobierz mecze.") }
+    var loading by remember { mutableStateOf(false) }
+    var showKey by remember { mutableStateOf(false) }
+    var leagueCount by remember { mutableStateOf<Int?>(null) }
+    var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
+    var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
+    var selectedSeason by remember { mutableStateOf<Int?>(null) }
+    var leagueMenuExpanded by remember { mutableStateOf(false) }
+    var seasonMenuExpanded by remember { mutableStateOf(false) }
+    var standings by remember { mutableStateOf(emptyList<ApiFootballStanding>()) }
+    var leagueQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var stakeInput by remember { mutableStateOf("1.00") }
+
     LaunchedEffect(Unit) {
         val keyToRestore = apiKey.trim()
         if (keyToRestore.isNotBlank()) {
@@ -128,22 +145,7 @@ fun ApiFootballScreen(
             }
         }
     }
-    var fixtures by remember { mutableStateOf(emptyList<ApiFootballFixture>()) }
-    var selected by remember { mutableStateOf<ApiFootballFixture?>(null) }
-    var research by remember { mutableStateOf<FixtureResearch?>(null) }
-    var status by remember { mutableStateOf("Wpisz klucz API-Football i pobierz mecze.") }
-    var loading by remember { mutableStateOf(false) }
-    var showKey by remember { mutableStateOf(false) }
-    var leagueCount by remember { mutableStateOf<Int?>(null) }
-    var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
-    var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
-    var selectedSeason by remember { mutableStateOf<Int?>(null) }
-    var leagueMenuExpanded by remember { mutableStateOf(false) }
-    var seasonMenuExpanded by remember { mutableStateOf(false) }
-    var standings by remember { mutableStateOf(emptyList<ApiFootballStanding>()) }
-    var leagueQuery by remember { mutableStateOf("") }
-    var searchQuery by remember { mutableStateOf("") }
-    var stakeInput by remember { mutableStateOf("1.00") }
+
     val filteredLeagues = remember(availableLeagues, leagueQuery) {
         val query = leagueQuery.trim()
         if (query.isBlank()) availableLeagues else availableLeagues.filter { league ->
