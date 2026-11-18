@@ -59,6 +59,13 @@ data class ApiFootballOdds(
 object ApiFootballRepository {
     private const val BASE_URL = "https://v3.football.api-sports.io"
 
+    fun clearCache(context: Context) {
+        context.getSharedPreferences(
+            "api_football_response_cache",
+            Context.MODE_PRIVATE
+        ).edit().clear().apply()
+    }
+
     private fun request(context: Context, apiKey: String, path: String, query: Map<String, String> = emptyMap()): JSONObject {
         require(apiKey.isNotBlank()) { "Dodaj klucz API-Football w ustawieniach." }
         val queryString = query.entries.joinToString("&") { (key, value) ->
@@ -120,10 +127,23 @@ object ApiFootballRepository {
                 .joinToString("; ")
             throw IllegalStateException("Błąd API-Football: $details")
         }
-        cache.edit()
+        val editor = cache.edit()
             .putString(cacheKey, body)
             .putLong(cacheKey + "_time", System.currentTimeMillis())
-            .apply()
+        val timestampKeys = cache.all.keys.filter {
+            it.startsWith("response_") && it.endsWith("_time")
+        }
+        if (timestampKeys.size > 200) {
+            val removeCount = timestampKeys.size - 150
+            timestampKeys
+                .sortedBy { cache.getLong(it, 0L) }
+                .take(removeCount)
+                .forEach { timestampKey ->
+                    val responseKey = timestampKey.removeSuffix("_time")
+                    editor.remove(responseKey).remove(timestampKey)
+                }
+        }
+        editor.apply()
         return json
     }
 
