@@ -126,7 +126,7 @@ fun ApiFootballScreen(context: Context) {
             onClick = {
                 if (apiKey.isBlank()) {
                     status = "Wpisz klucz API-Football."
-                } else if (!date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
+                } else if (!FootballDateValidator.isValid(date)) {
                     status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
                 } else {
                     loading = true
