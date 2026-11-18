@@ -48,9 +48,85 @@ fun ApiFootballScreen(
     onSeasonMatchesLoaded: (List<FootballMatch>) -> Unit = {}
 ) {
     var apiKey by remember { mutableStateOf(ApiFootballSettings.getApiKey(context)) }
+    val screenPreferences = remember {
+        context.getSharedPreferences("api_football_screen_state", Context.MODE_PRIVATE)
+    }
     var date by remember { mutableStateOf(selectedDate) }
     LaunchedEffect(selectedDate) {
         date = selectedDate
+    }
+
+    LaunchedEffect(Unit) {
+        val keyToRestore = apiKey.trim()
+        if (keyToRestore.isNotBlank()) {
+            loading = true
+            status = "Przywracam zapisane ligi i wybrany sezon..."
+            thread {
+                try {
+                    val year = SimpleDateFormat("yyyy", Locale.US).format(Date()).toInt()
+                    val result = ApiFootballRepository.fetchCurrentLeagues(
+                        context, keyToRestore, year
+                    )
+                    val savedLeagueId = screenPreferences.getInt("selected_league_id", -1)
+                    val restoredLeague = result.firstOrNull { it.id == savedLeagueId }
+                    val savedSeason = screenPreferences.getInt(
+                        "selected_season",
+                        restoredLeague?.season ?: year
+                    )
+                    val restoredSeason = restoredLeague?.seasons
+                        ?.firstOrNull { it == savedSeason } ?: restoredLeague?.season
+                    val restoredFixtures = if (restoredLeague != null) {
+                        runCatching {
+                            ApiFootballRepository.fetchFixtures(
+                                context,
+                                keyToRestore,
+                                selectedDate,
+                                restoredLeague.id,
+                                restoredSeason
+                            )
+                        }.getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+                    Handler(Looper.getMainLooper()).post {
+                        if (apiKey.trim() == keyToRestore) {
+                            availableLeagues = result
+                            leagueCount = result.size
+                            selectedLeague = restoredLeague
+                            selectedSeason = restoredSeason
+                            if (restoredLeague != null) {
+                                fixtures = restoredFixtures
+                                onFixturesLoaded(restoredFixtures.map { fixture ->
+                                    FootballMatch(
+                                        league = fixture.leagueName,
+                                        home = fixture.home,
+                                        away = fixture.away,
+                                        score = fixture.score,
+                                        date = fixture.date,
+                                        source = "API-Football"
+                                    )
+                                })
+                            }
+                            status = "Przywrócono ligi: ${result.size}" +
+                                if (restoredLeague != null) {
+                                    " • wybrano ${restoredLeague.name}, sezon ${restoredSeason}"
+                                } else {
+                                    " • wybierz ligę, aby pobrać sezon do TOP"
+                                }
+                        }
+                        loading = false
+                    }
+                } catch (e: Exception) {
+                    Handler(Looper.getMainLooper()).post {
+                        if (apiKey.trim() == keyToRestore) {
+                            status = "Nie udało się przywrócić lig: " +
+                                (e.message ?: "błąd API")
+                        }
+                        loading = false
+                    }
+                }
+            }
+        }
     }
     var fixtures by remember { mutableStateOf(emptyList<ApiFootballFixture>()) }
     var selected by remember { mutableStateOf<ApiFootballFixture?>(null) }
@@ -127,6 +203,7 @@ fun ApiFootballScreen(
                     ApiFootballRepository.clearCache(context)
                     onFixturesLoaded(emptyList())
                     onSeasonMatchesLoaded(emptyList())
+                    screenPreferences.edit().clear().apply()
                     apiKey = ""
                     availableLeagues = emptyList()
                     selectedLeague = null
@@ -161,8 +238,15 @@ fun ApiFootballScreen(
                                     if (apiKey.trim() == keyToCheck) {
                                         availableLeagues = result
                                         leagueCount = result.size
-                                        selectedLeague = null
-                                        selectedSeason = null
+                                        val savedLeagueId = screenPreferences.getInt("selected_league_id", -1)
+                                        val restoredLeague = result.firstOrNull { it.id == savedLeagueId }
+                                        val savedSeason = screenPreferences.getInt(
+                                            "selected_season",
+                                            restoredLeague?.season ?: year
+                                        )
+                                        selectedLeague = restoredLeague
+                                        selectedSeason = restoredLeague?.seasons
+                                            ?.firstOrNull { it == savedSeason } ?: restoredLeague?.season
                                         standings = emptyList()
                                         fixtures = emptyList()
                                         selected = null
@@ -231,6 +315,10 @@ fun ApiFootballScreen(
                         onClick = {
                             selectedLeague = null
                             selectedSeason = null
+                            screenPreferences.edit()
+                                .remove("selected_league_id")
+                                .remove("selected_season")
+                                .apply()
                             onFixturesLoaded(emptyList())
                             onSeasonMatchesLoaded(emptyList())
                             standings = emptyList()
@@ -252,6 +340,10 @@ fun ApiFootballScreen(
                             onClick = {
                                 selectedLeague = league
                                 selectedSeason = league.season
+                                screenPreferences.edit()
+                                    .putInt("selected_league_id", league.id)
+                                    .putInt("selected_season", league.season)
+                                    .apply()
                                 onFixturesLoaded(emptyList())
                                 onSeasonMatchesLoaded(emptyList())
                                 standings = emptyList()
@@ -286,6 +378,9 @@ fun ApiFootballScreen(
                             text = { Text(season.toString()) },
                             onClick = {
                                 selectedSeason = season
+                                screenPreferences.edit()
+                                    .putInt("selected_season", season)
+                                    .apply()
                                 onFixturesLoaded(emptyList())
                                 onSeasonMatchesLoaded(emptyList())
                                 standings = emptyList()
