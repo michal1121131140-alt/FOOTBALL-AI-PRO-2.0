@@ -48,7 +48,18 @@ fun ApiFootballScreen(context: Context) {
     var loading by remember { mutableStateOf(false) }
     var showKey by remember { mutableStateOf(false) }
     var leagueCount by remember { mutableStateOf<Int?>(null) }
+    var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
+    var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
+    var leagueMenuExpanded by remember { mutableStateOf(false) }
+    var leagueQuery by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    val filteredLeagues = remember(availableLeagues, leagueQuery) {
+        val query = leagueQuery.trim()
+        if (query.isBlank()) availableLeagues else availableLeagues.filter { league ->
+            league.name.contains(query, ignoreCase = true) ||
+                league.country.contains(query, ignoreCase = true)
+        }
+    }
     val filteredFixtures = remember(fixtures, searchQuery) {
         val query = searchQuery.trim()
         if (query.isBlank()) fixtures else fixtures.filter { fixture ->
@@ -88,16 +99,19 @@ fun ApiFootballScreen(context: Context) {
                     if (apiKey.isBlank()) {
                         status = "Wpisz klucz API."
                     } else {
+                        val keyToCheck = apiKey.trim()
                         loading = true
                         status = "Sprawdzam klucz i dostępne ligi..."
                         thread {
                             try {
                                 val year = SimpleDateFormat("yyyy", Locale.US).format(Date()).toInt()
-                                val count = ApiFootballRepository.fetchCurrentLeagues(context, apiKey, year).size
-                                ApiFootballSettings.saveApiKey(context, apiKey)
+                                val result = ApiFootballRepository.fetchCurrentLeagues(context, keyToCheck, year)
+                                ApiFootballSettings.saveApiKey(context, keyToCheck)
                                 Handler(Looper.getMainLooper()).post {
-                                    leagueCount = count
-                                    status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + count
+                                    availableLeagues = result
+                                    leagueCount = result.size
+                                    selectedLeague = null
+                                    status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -122,6 +136,57 @@ fun ApiFootballScreen(context: Context) {
             label = { Text("Data (RRRR-MM-DD)") }
         )
 
+        if (availableLeagues.isNotEmpty()) {
+            Text("FILTR ROZGRYWEK", color = ApiMuted, fontSize = 10.sp)
+            OutlinedTextField(
+                value = leagueQuery,
+                onValueChange = { leagueQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Szukaj ligi lub kraju") }
+            )
+            Box {
+                Button(
+                    onClick = { leagueMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+                ) {
+                    val label = selectedLeague?.let {
+                        it.name + if (it.country.isNotBlank()) " • " + it.country else ""
+                    } ?: "Wszystkie ligi"
+                    Text(label, color = ApiWhite)
+                }
+                DropdownMenu(
+                    expanded = leagueMenuExpanded,
+                    onDismissRequest = { leagueMenuExpanded = false },
+                    modifier = Modifier.heightIn(max = 360.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Wszystkie ligi") },
+                        onClick = {
+                            selectedLeague = null
+                            leagueMenuExpanded = false
+                        }
+                    )
+                    filteredLeagues.forEach { league ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    league.name + if (league.country.isNotBlank()) {
+                                        " • " + league.country
+                                    } else ""
+                                )
+                            },
+                            onClick = {
+                                selectedLeague = league
+                                leagueMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         Button(
             onClick = {
                 if (apiKey.isBlank()) {
@@ -129,13 +194,22 @@ fun ApiFootballScreen(context: Context) {
                 } else if (!FootballDateValidator.isValid(date)) {
                     status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
                 } else {
+                    val keyForRequest = apiKey.trim()
+                    val requestedDate = date
+                    val leagueFilter = selectedLeague
                     loading = true
                     selected = null
                     research = null
-                    status = "Pobieram spotkania ze wszystkich dostępnych lig..."
+                    status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
                     thread {
                         try {
-                            val result = ApiFootballRepository.fetchFixtures(context, apiKey, date)
+                            val result = ApiFootballRepository.fetchFixtures(
+                                context,
+                                keyForRequest,
+                                requestedDate,
+                                leagueId = leagueFilter?.id,
+                                season = leagueFilter?.season
+                            )
                             Handler(Looper.getMainLooper()).post {
                                 fixtures = result
                                 status = if (result.isEmpty()) "Brak spotkań w bazie dla tej daty." else "Znaleziono spotkań: " + result.size
@@ -185,18 +259,19 @@ fun ApiFootballScreen(context: Context) {
                 if (research == null) {
                     Button(
                         onClick = {
+                            val keyForRequest = apiKey.trim()
                             loading = true
                             status = "Pobieram prognozę, absencje i kursy..."
                             thread {
                                 try {
                                     val predictionResult = runCatching {
-                                        ApiFootballRepository.fetchPredictions(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchPredictions(context, keyForRequest, fixture.id)
                                     }
                                     val injuriesResult = runCatching {
-                                        ApiFootballRepository.fetchInjuries(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchInjuries(context, keyForRequest, fixture.id)
                                     }
                                     val oddsResult = runCatching {
-                                        ApiFootballRepository.fetchOdds(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchOdds(context, keyForRequest, fixture.id)
                                     }
                                     val errors = buildList {
                                         predictionResult.exceptionOrNull()?.let { add("Prognoza: ${it.message ?: "błąd API"}") }
