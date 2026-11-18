@@ -90,8 +90,12 @@ fun ApiFootballScreen(context: Context) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(
                 onClick = {
-                    ApiFootballSettings.saveApiKey(context, apiKey)
-                    status = "Klucz zapisany i zaszyfrowany na tym urządzeniu."
+                    status = runCatching {
+                        ApiFootballSettings.saveApiKey(context, apiKey)
+                        "Klucz zapisany i zaszyfrowany na tym urządzeniu."
+                    }.getOrElse {
+                        "Nie udało się zapisać klucza: " + (it.message ?: "błąd Android Keystore")
+                    }
                 },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
