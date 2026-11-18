@@ -181,8 +181,15 @@ class MainActivity : ComponentActivity() {
                         }
 
                         if (finalResult != null) {
-                            score = "${finalResult.optInt("pointsTeam1")} : " +
-                                "${finalResult.optInt("pointsTeam2")}"
+                            val homeGoals = finalResult.opt("pointsTeam1")
+                                ?.toString()?.toIntOrNull()
+                            val awayGoals = finalResult.opt("pointsTeam2")
+                                ?.toString()?.toIntOrNull()
+                            if (homeGoals != null && awayGoals != null &&
+                                homeGoals >= 0 && awayGoals >= 0
+                            ) {
+                                score = "$homeGoals : $awayGoals"
+                            }
                         }
                     }
 
