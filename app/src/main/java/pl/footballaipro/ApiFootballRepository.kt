@@ -12,7 +12,22 @@ data class ApiFootballLeague(
     val id: Int,
     val name: String,
     val country: String,
-    val season: Int
+    val season: Int,
+    val seasons: List<Int> = listOf(season)
+)
+
+data class ApiFootballStanding(
+    val rank: Int,
+    val team: String,
+    val points: Int,
+    val played: Int,
+    val wins: Int,
+    val draws: Int,
+    val losses: Int,
+    val goalsFor: Int,
+    val goalsAgainst: Int,
+    val goalDifference: Int,
+    val form: String
 )
 
 data class ApiFootballFixture(
@@ -164,15 +179,19 @@ object ApiFootballRepository {
                 val item = response.optJSONObject(i) ?: continue
                 val league = item.optJSONObject("league") ?: continue
                 val country = item.optJSONObject("country")?.optString("name").orEmpty()
-                val seasons = item.optJSONArray("seasons") ?: JSONArray()
-                val seasonAvailable = (0 until seasons.length()).any { index ->
-                    seasons.optJSONObject(index)?.optInt("year") == season
-                }
-                if (!seasonAvailable) continue
+                val seasonsArray = item.optJSONArray("seasons") ?: JSONArray()
+                val seasonYears = (0 until seasonsArray.length())
+                    .mapNotNull { index ->
+                        seasonsArray.optJSONObject(index)?.optInt("year")
+                            ?.takeIf { it > 0 }
+                    }
+                    .distinct()
+                    .sortedDescending()
+                if (season !in seasonYears) continue
                 val id = league.optInt("id")
                 val name = league.optString("name")
                 if (id > 0 && name.isNotBlank()) {
-                    leagues.add(ApiFootballLeague(id, name, country, season))
+                    leagues.add(ApiFootballLeague(id, name, country, season, seasonYears))
                 }
             }
             page++
@@ -271,6 +290,52 @@ object ApiFootballRepository {
             )
         }
         return fixtures
+    }
+
+    fun fetchStandings(
+        context: Context,
+        apiKey: String,
+        leagueId: Int,
+        season: Int
+    ): List<ApiFootballStanding> {
+        val response = request(
+            context,
+            apiKey,
+            "/standings",
+            mapOf("league" to leagueId.toString(), "season" to season.toString())
+        ).optJSONArray("response") ?: return emptyList()
+
+        val result = mutableListOf<ApiFootballStanding>()
+        for (i in 0 until response.length()) {
+            val league = response.optJSONObject(i)?.optJSONObject("league") ?: continue
+            val groups = league.optJSONArray("standings") ?: continue
+            for (groupIndex in 0 until groups.length()) {
+                val group = groups.optJSONArray(groupIndex) ?: continue
+                for (rowIndex in 0 until group.length()) {
+                    val row = group.optJSONObject(rowIndex) ?: continue
+                    val team = row.optJSONObject("team")?.optString("name").orEmpty()
+                    if (team.isBlank()) continue
+                    val all = row.optJSONObject("all") ?: JSONObject()
+                    val goals = all.optJSONObject("goals") ?: JSONObject()
+                    result.add(
+                        ApiFootballStanding(
+                            rank = row.optInt("rank"),
+                            team = team,
+                            points = row.optInt("points"),
+                            played = all.optInt("played"),
+                            wins = all.optInt("win"),
+                            draws = all.optInt("draw"),
+                            losses = all.optInt("lose"),
+                            goalsFor = goals.optInt("for"),
+                            goalsAgainst = goals.optInt("against"),
+                            goalDifference = row.optInt("goalsDiff"),
+                            form = row.optString("form")
+                        )
+                    )
+                }
+            }
+        }
+        return result.sortedWith(compareBy({ it.rank }, { it.team }))
     }
 
     fun fetchPredictions(context: Context, apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
