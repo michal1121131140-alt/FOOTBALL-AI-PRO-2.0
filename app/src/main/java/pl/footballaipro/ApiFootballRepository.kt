@@ -120,7 +120,8 @@ object ApiFootballRepository {
         val cacheTtl = when {
             path == "/fixtures" && queryString.contains("live=all") -> 30L * 1000L
             path == "/leagues" -> 24L * 60L * 60L * 1000L
-            path == "/fixtures" -> 15L * 60L * 1000L
+            path == "/fixtures" && queryString.contains("date=") -> 15L * 60L * 1000L
+            path == "/fixtures" -> 6L * 60L * 60L * 1000L
             path == "/odds" -> 3L * 60L * 60L * 1000L
             else -> 6L * 60L * 60L * 1000L
         }
@@ -253,6 +254,36 @@ object ApiFootballRepository {
             page++
         } while (page <= totalPages && page <= 100)
         return fixtures.distinctBy { it.id }.sortedWith(compareBy({ it.date }, { it.time }, { it.leagueName }))
+    }
+
+    fun fetchSeasonFixtures(
+        context: Context,
+        apiKey: String,
+        leagueId: Int,
+        season: Int
+    ): List<ApiFootballFixture> {
+        val baseQuery = linkedMapOf(
+            "league" to leagueId.toString(),
+            "season" to season.toString(),
+            "timezone" to "Europe/Warsaw"
+        )
+        val fixtures = mutableListOf<ApiFootballFixture>()
+        var page = 1
+        var totalPages = 1
+        do {
+            val query = baseQuery.toMutableMap()
+            query["page"] = page.toString()
+            val payload = request(context, apiKey, "/fixtures", query)
+            totalPages = payload.optJSONObject("paging")
+                ?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
+            val response = payload.optJSONArray("response") ?: JSONArray()
+            fixtures.addAll(parseFixtureResponse(response))
+            page++
+        } while (page <= totalPages && page <= 100)
+
+        return fixtures.distinctBy { it.id }.sortedWith(
+            compareBy({ it.date }, { it.time }, { it.leagueName })
+        )
     }
 
     fun fetchLiveFixtures(
