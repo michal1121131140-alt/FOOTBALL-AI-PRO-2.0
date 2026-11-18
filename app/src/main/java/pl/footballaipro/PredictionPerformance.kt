@@ -55,7 +55,10 @@ object PredictionPerformance {
 
     fun getAll(context: Context): List<PredictionRecord> {
         val json = preferences(context).getString(KEY, "[]") ?: "[]"
-        val array = JSONArray(json)
+        val array = runCatching { JSONArray(json) }.getOrElse {
+            // A damaged preference must not crash the statistics screen.
+            return emptyList()
+        }
         val records = mutableListOf<PredictionRecord>()
 
         for (i in 0 until array.length()) {
