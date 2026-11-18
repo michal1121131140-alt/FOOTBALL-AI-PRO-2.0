@@ -1,6 +1,14 @@
-# FOOTBALL AI PRO 2.0.2
+# FOOTBALL AI PRO 2.0.3
 
 Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny prawdopodobieństwa rynków bukmacherskich.
+
+## Zmiany w 2.0.3
+
+- Czytelniejsze komunikaty błędów API-Football, w tym błędnego klucza, limitu zapytań i ograniczeń planu.
+- Zabezpieczenie ekranu przed opóźnionymi komunikatami z poprzednio wybranej ligi, sezonu, daty lub meczu.
+- Dokładniejszy test historyczny: dopasowanie nazw drużyn bez rozróżniania wielkości liter i testy minimalnej liczby wcześniejszych spotkań.
+- Bezpieczniejsza migracja starszych kluczy API: aplikacja nie wraca do używania klucza w postaci jawnego tekstu, gdy szyfrowanie się nie powiedzie.
+- Komunikaty o odpowiedzialnym korzystaniu z analiz i zakładów.
 
 ## Funkcje
 
