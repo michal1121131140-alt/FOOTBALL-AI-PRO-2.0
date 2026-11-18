@@ -253,6 +253,8 @@ fun FootballApp(
     var leagues by remember { mutableStateOf(emptyList<FootballLeague>()) }
     var matches by remember { mutableStateOf(emptyList<FootballMatch>()) }
     var seasonMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
+    var globalMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
+    var globalSeasonMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
     var table by remember { mutableStateOf(emptyList<LeagueStanding>()) }
 
     var selectedLeague by remember { mutableStateOf<FootballLeague?>(null) }
@@ -291,8 +293,19 @@ fun FootballApp(
         }
     }
 
-    val formByTeam = remember(seasonMatches, date) {
-        val previous = seasonMatches.filter { it.date < date }
+    val combinedSeasonMatches = remember(seasonMatches, globalSeasonMatches) {
+        (seasonMatches + globalSeasonMatches).distinctBy {
+            "${it.league}|${it.home}|${it.away}|${it.date}"
+        }
+    }
+    val combinedDailyMatches = remember(matches, globalMatches, date) {
+        (matches + globalMatches.filter { it.date == date }).distinctBy {
+            "${it.league}|${it.home}|${it.away}|${it.date}"
+        }
+    }
+
+    val formByTeam = remember(combinedSeasonMatches, date) {
+        val previous = combinedSeasonMatches.filter { it.date < date }
 
         previous.flatMap { listOf(it.home, it.away) }
             .distinct()
@@ -301,9 +314,9 @@ fun FootballApp(
             }
     }
 
-    val rankedMatches = remember(matches, seasonMatches, formByTeam) {
-        val predictions = matches.mapNotNull { match ->
-            val previous = seasonMatches.filter { it.date < match.date }
+    val rankedMatches = remember(combinedDailyMatches, combinedSeasonMatches, formByTeam) {
+        val predictions = combinedDailyMatches.mapNotNull { match ->
+            val previous = combinedSeasonMatches.filter { it.date < match.date }
             val homeStats = buildTeamStats(match.home, previous)
             val awayStats = buildTeamStats(match.away, previous)
 
@@ -316,7 +329,7 @@ fun FootballApp(
                     val h2h = HeadToHeadAnalyzer.calculate(
                         match.home, match.away, previous, 10
                     )
-                    (match.home + "|" + match.away) to
+                    (match.league + "|" + match.home + "|" + match.away) to
                         FootballAnalyzer.calculate(
                             homeStats, awayStats, homeForm, awayForm, h2h
                         )
@@ -330,7 +343,7 @@ fun FootballApp(
 
         DailyMatchRanker.rank(
             // TOP ma prezentować tylko spotkania, które nie mają jeszcze wyniku końcowego.
-            matches = matches.filter { FootballScoreParser.parse(it.score) == null },
+            matches = combinedDailyMatches.filter { FootballScoreParser.parse(it.score) == null },
             formByTeam = formByTeam,
             predictions = predictions,
             limit = 10
@@ -411,7 +424,11 @@ fun FootballApp(
 
             when (screen) {
                 "GLOBAL" -> {
-                    ApiFootballScreen(context = context)
+                    ApiFootballScreen(
+                        context = context,
+                        onFixturesLoaded = { globalMatches = it },
+                        onSeasonMatchesLoaded = { globalSeasonMatches = it }
+                    )
                 }
 
                 "MECZE" -> {
@@ -1172,7 +1189,7 @@ fun FootballApp(
                 }
 
                 "STATYSTYKI" -> {
-                    PerformanceScreen(seasonMatches)
+                    PerformanceScreen(combinedSeasonMatches)
                 }
             }
         }
