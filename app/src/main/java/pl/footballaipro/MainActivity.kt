@@ -1061,7 +1061,13 @@ fun FootballApp(
                                 Button(
                                     onClick = {
                                         scope.launch {
-                                            val updated = (history + match).distinct()
+                                            val updated = history.filterNot { saved ->
+                                                saved.league.equals(match.league, true) &&
+                                                    saved.home.equals(match.home, true) &&
+                                                    saved.away.equals(match.away, true) &&
+                                                    saved.date == match.date &&
+                                                    saved.source == match.source
+                                            } + match
                                             FootballStorage.saveHistory(context, updated)
                                             status = "Mecz zapisany w historii."
                                         }
