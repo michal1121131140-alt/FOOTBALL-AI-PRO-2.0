@@ -487,8 +487,9 @@ fun ApiFootballScreen(
                         val keyForRequest = apiKey.trim()
                         val leagueForRequest = league
                         val seasonForRequest = selectedSeason ?: league.season
+                        val requestedDate = date
                         loading = true
-                        status = "Pobieram cały sezon ${league.name} ${seasonForRequest} do TOP i testu historycznego..."
+                        status = "Pobieram sezon i mecze na dzień ${requestedDate} dla ${league.name}..."
                         thread {
                             try {
                                 val result = ApiFootballRepository.fetchSeasonFixtures(
@@ -496,6 +497,13 @@ fun ApiFootballScreen(
                                     keyForRequest,
                                     leagueForRequest.id,
                                     seasonForRequest
+                                )
+                                val dailyResult = ApiFootballRepository.fetchFixtures(
+                                    context,
+                                    keyForRequest,
+                                    requestedDate,
+                                    leagueId = leagueForRequest.id,
+                                    season = seasonForRequest
                                 )
                                 val settledCount = settleFinishedApiFixtures(context, result)
                                 val converted = result.map { fixture ->
@@ -514,7 +522,20 @@ fun ApiFootballScreen(
                                         selectedSeason == seasonForRequest
                                     ) {
                                         onSeasonMatchesLoaded(converted)
-                                        status = "Dane sezonu załadowane: ${converted.size} spotkań. Rozliczono typów: ${settledCount}. TOP i test historyczny mogą z nich korzystać."
+                                        if (date == requestedDate) {
+                                            fixtures = dailyResult
+                                            onFixturesLoaded(dailyResult.map { fixture ->
+                                                FootballMatch(
+                                                    league = fixture.leagueName,
+                                                    home = fixture.home,
+                                                    away = fixture.away,
+                                                    score = fixture.score,
+                                                    date = fixture.date,
+                                                    source = "API-Football"
+                                                )
+                                            })
+                                        }
+                                        status = "Sezon: ${converted.size} spotkań • mecze ${requestedDate}: ${dailyResult.size} • rozliczono typów: ${settledCount}. Dane są dostępne w TOP i teście historycznym."
                                     }
                                     loading = false
                                 }
@@ -522,9 +543,10 @@ fun ApiFootballScreen(
                                 Handler(Looper.getMainLooper()).post {
                                     if (
                                         selectedLeague?.id == leagueForRequest.id &&
-                                        selectedSeason == seasonForRequest
+                                        selectedSeason == seasonForRequest &&
+                                        date == requestedDate
                                     ) {
-                                        status = "Błąd pobierania sezonu: " + (e.message ?: "nieznany błąd")
+                                        status = "Błąd pobierania sezonu i meczów: " + (e.message ?: "nieznany błąd")
                                     }
                                     loading = false
                                 }
@@ -536,7 +558,7 @@ fun ApiFootballScreen(
                 enabled = !loading,
                 colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
             ) {
-                Text("POBIERZ SEZON DO TOP I TESTU HISTORYCZNEGO", fontSize = 10.sp)
+                Text("POBIERZ SEZON I MECZE DO TOP", fontSize = 10.sp)
             }
         }
 
