@@ -1,6 +1,11 @@
-# FOOTBALL AI PRO 2.0.4
+# FOOTBALL AI PRO 2.0.5
 
 Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny prawdopodobieństwa rynków bukmacherskich.
+
+## Zmiany w 2.0.5
+
+- Zabezpieczenie modelu Poissona przed nieprawidłowymi statystykami wejściowymi (NaN, nieskończoność, wartości ujemne i błędne liczby rozegranych spotkań).
+- Wiarygodność prognozy jest ograniczana do zakresu 0–100% i nie otrzymuje bonusu za wadliwe statystyki dom/wyjazd.
 
 ## Zmiany w 2.0.4
 
