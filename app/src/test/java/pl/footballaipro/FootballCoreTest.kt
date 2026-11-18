@@ -124,6 +124,39 @@ class FootballCoreTest {
         assertFalse(FootballDateValidator.isValid(""))
     }
 
+    @Test
+    fun marketPerformanceStatsUseSettledRecordsOnly() {
+        val records = listOf(
+            PredictionRecord(
+                id = "1", league = "League", home = "A", away = "B",
+                market = "1X2", selection = "1", odds = 2.0,
+                probability = 60.0, stake = 10.0, createdAt = 1L,
+                settled = true, won = true, profit = 10.0
+            ),
+            PredictionRecord(
+                id = "2", league = "League", home = "C", away = "D",
+                market = "1X2", selection = "2", odds = 2.0,
+                probability = 40.0, stake = 10.0, createdAt = 2L,
+                settled = true, won = false, profit = -10.0
+            ),
+            PredictionRecord(
+                id = "3", league = "League", home = "E", away = "F",
+                market = "1X2", selection = "1", odds = 2.0,
+                probability = 50.0, stake = 10.0, createdAt = 3L
+            )
+        )
+
+        val stats = PredictionPerformance.getMarketStats(records).single()
+
+        assertEquals("1X2", stats.market)
+        assertEquals(2, stats.settled)
+        assertEquals(1, stats.wins)
+        assertEquals(1, stats.losses)
+        assertEquals(50.0, stats.winRate, 0.0001)
+        assertEquals(20.0, stats.totalStake, 0.0001)
+        assertEquals(0.0, stats.roi, 0.0001)
+    }
+
     private fun match(
         home: String,
         away: String,
