@@ -102,6 +102,26 @@ class FootballCoreLogicTest {
         ValueBetting.calculate(50.0, 1.0)
     }
 
+    @Test
+    fun apiErrorsExplainAuthenticationQuotaAndServerFailures() {
+        assertTrue(apiHttpErrorMessage(401, null).contains("klucz API-Football"))
+        assertTrue(apiHttpErrorMessage(429, null).contains("limit zapytań"))
+        assertTrue(apiHttpErrorMessage(503, null).contains("chwilowy problem"))
+    }
+
+    @Test
+    fun apiErrorsIncludeProviderDetailsWithoutHidingHttpMeaning() {
+        val payload = org.json.JSONObject().put(
+            "errors",
+            org.json.JSONObject().put("token", "Invalid API key")
+        )
+
+        val message = apiHttpErrorMessage(401, payload)
+
+        assertTrue(message.contains("Klucz API-Football"))
+        assertTrue(message.contains("Invalid API key"))
+    }
+
     private fun match(
         home: String,
         away: String,
