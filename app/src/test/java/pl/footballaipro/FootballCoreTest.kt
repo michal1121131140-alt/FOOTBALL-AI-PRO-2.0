@@ -115,6 +115,15 @@ class FootballCoreTest {
         assertEquals(matches.size, summary.skippedMatches)
     }
 
+    @Test
+    fun dateValidatorRejectsImpossibleAndMalformedDates() {
+        assertTrue(FootballDateValidator.isValid("2026-11-18"))
+        assertFalse(FootballDateValidator.isValid("2026-02-30"))
+        assertFalse(FootballDateValidator.isValid("2026-13-01"))
+        assertFalse(FootballDateValidator.isValid("18-11-2026"))
+        assertFalse(FootballDateValidator.isValid(""))
+    }
+
     private fun match(
         home: String,
         away: String,
