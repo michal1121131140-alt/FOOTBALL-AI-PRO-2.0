@@ -26,6 +26,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -304,50 +306,56 @@ fun FootballApp(
         }
     }
 
-    val formByTeam = remember(combinedSeasonMatches, date) {
-        val previous = combinedSeasonMatches.filter { it.date < date }
+    var rankedMatches by remember { mutableStateOf(emptyList<RankedMatch>()) }
+    var rankingLoading by remember { mutableStateOf(false) }
 
-        previous.flatMap { listOf(it.home, it.away) }
-            .distinct()
-            .associateWith { team ->
-                TeamFormAnalyzer.calculate(team, previous)
-            }
-    }
+    LaunchedEffect(combinedDailyMatches, combinedSeasonMatches, date) {
+        rankingLoading = true
+        rankedMatches = withContext(Dispatchers.Default) {
+            val previousForDate = combinedSeasonMatches.filter { it.date < date }
+            val formByTeam = previousForDate
+                .flatMap { listOf(it.home, it.away) }
+                .distinct()
+                .associateWith { team ->
+                    TeamFormAnalyzer.calculate(team, previousForDate)
+                }
 
-    val rankedMatches = remember(combinedDailyMatches, combinedSeasonMatches, formByTeam) {
-        val predictions = combinedDailyMatches.mapNotNull { match ->
-            val previous = combinedSeasonMatches.filter { it.date < match.date }
-            val homeStats = buildTeamStats(match.home, previous)
-            val awayStats = buildTeamStats(match.away, previous)
+            val predictions = combinedDailyMatches.mapNotNull { match ->
+                val previous = combinedSeasonMatches.filter { it.date < match.date }
+                val homeStats = buildTeamStats(match.home, previous)
+                val awayStats = buildTeamStats(match.away, previous)
 
-            if (homeStats != null && awayStats != null) {
-                try {
-                    val homeForm = formByTeam[match.home]
-                        ?: TeamFormAnalyzer.calculate(match.home, previous)
-                    val awayForm = formByTeam[match.away]
-                        ?: TeamFormAnalyzer.calculate(match.away, previous)
-                    val h2h = HeadToHeadAnalyzer.calculate(
-                        match.home, match.away, previous, 10
-                    )
-                    (match.league + "|" + match.home + "|" + match.away) to
-                        FootballAnalyzer.calculate(
-                            homeStats, awayStats, homeForm, awayForm, h2h
+                if (homeStats != null && awayStats != null) {
+                    try {
+                        val homeForm = formByTeam[match.home]
+                            ?: TeamFormAnalyzer.calculate(match.home, previous)
+                        val awayForm = formByTeam[match.away]
+                            ?: TeamFormAnalyzer.calculate(match.away, previous)
+                        val h2h = HeadToHeadAnalyzer.calculate(
+                            match.home, match.away, previous, 10
                         )
-                } catch (_: Exception) {
+                        (match.league + "|" + match.home + "|" + match.away) to
+                            FootballAnalyzer.calculate(
+                                homeStats, awayStats, homeForm, awayForm, h2h
+                            )
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
                     null
                 }
-            } else {
-                null
-            }
-        }.toMap()
+            }.toMap()
 
-        DailyMatchRanker.rank(
-            // TOP ma prezentować tylko spotkania, które nie mają jeszcze wyniku końcowego.
-            matches = combinedDailyMatches.filter { FootballScoreParser.parse(it.score) == null },
-            formByTeam = formByTeam,
-            predictions = predictions,
-            limit = 10
-        )
+            DailyMatchRanker.rank(
+                matches = combinedDailyMatches.filter {
+                    FootballScoreParser.parse(it.score) == null
+                },
+                formByTeam = formByTeam,
+                predictions = predictions,
+                limit = 10
+            )
+        }
+        rankingLoading = false
     }
 
     MaterialTheme(
@@ -553,8 +561,15 @@ fun FootballApp(
                     )
                     Spacer(Modifier.height(10.dp))
 
-                    if (matches.isEmpty()) {
-                        InfoCard("Najpierw pobierz mecze w zakładce MECZE.")
+                    if (rankingLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Blue
+                        )
+                    } else if (combinedDailyMatches.isEmpty()) {
+                        InfoCard("Pobierz mecze w zakładce MECZE lub GLOBAL.")
+                    } else if (rankedMatches.isEmpty()) {
+                        InfoCard("Brak spotkań do rankingu dla wybranej daty.")
                     }
 
                     LazyColumn(
