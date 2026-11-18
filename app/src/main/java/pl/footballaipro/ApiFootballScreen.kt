@@ -202,6 +202,7 @@ fun ApiFootballScreen(context: Context) {
                         selected = null
                         research = null
                         fixtures = emptyList()
+                        searchQuery = ""
                         status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
                         thread {
                             try {
@@ -243,6 +244,7 @@ fun ApiFootballScreen(context: Context) {
                         selected = null
                         research = null
                         fixtures = emptyList()
+                        searchQuery = ""
                         status = "Pobieram wyniki na żywo..."
                         thread {
                             try {
