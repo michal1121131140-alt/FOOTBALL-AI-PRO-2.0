@@ -99,13 +99,14 @@ fun ApiFootballScreen(context: Context) {
                     if (apiKey.isBlank()) {
                         status = "Wpisz klucz API."
                     } else {
+                        val keyToCheck = apiKey.trim()
                         loading = true
                         status = "Sprawdzam klucz i dostępne ligi..."
                         thread {
                             try {
                                 val year = SimpleDateFormat("yyyy", Locale.US).format(Date()).toInt()
-                                val result = ApiFootballRepository.fetchCurrentLeagues(context, apiKey, year)
-                                ApiFootballSettings.saveApiKey(context, apiKey)
+                                val result = ApiFootballRepository.fetchCurrentLeagues(context, keyToCheck, year)
+                                ApiFootballSettings.saveApiKey(context, keyToCheck)
                                 Handler(Looper.getMainLooper()).post {
                                     availableLeagues = result
                                     leagueCount = result.size
@@ -193,17 +194,19 @@ fun ApiFootballScreen(context: Context) {
                 } else if (!date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) {
                     status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
                 } else {
+                    val keyForRequest = apiKey.trim()
+                    val requestedDate = date
+                    val leagueFilter = selectedLeague
                     loading = true
                     selected = null
                     research = null
-                    status = "Pobieram spotkania: " + (selectedLeague?.name ?: "wszystkie ligi") + "..."
+                    status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
                     thread {
                         try {
-                            val leagueFilter = selectedLeague
                             val result = ApiFootballRepository.fetchFixtures(
                                 context,
-                                apiKey,
-                                date,
+                                keyForRequest,
+                                requestedDate,
                                 leagueId = leagueFilter?.id,
                                 season = leagueFilter?.season
                             )
@@ -256,18 +259,19 @@ fun ApiFootballScreen(context: Context) {
                 if (research == null) {
                     Button(
                         onClick = {
+                            val keyForRequest = apiKey.trim()
                             loading = true
                             status = "Pobieram prognozę, absencje i kursy..."
                             thread {
                                 try {
                                     val predictionResult = runCatching {
-                                        ApiFootballRepository.fetchPredictions(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchPredictions(context, keyForRequest, fixture.id)
                                     }
                                     val injuriesResult = runCatching {
-                                        ApiFootballRepository.fetchInjuries(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchInjuries(context, keyForRequest, fixture.id)
                                     }
                                     val oddsResult = runCatching {
-                                        ApiFootballRepository.fetchOdds(context, apiKey, fixture.id)
+                                        ApiFootballRepository.fetchOdds(context, keyForRequest, fixture.id)
                                     }
                                     val errors = buildList {
                                         predictionResult.exceptionOrNull()?.let { add("Prognoza: ${it.message ?: "błąd API"}") }
