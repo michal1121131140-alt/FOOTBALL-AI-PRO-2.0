@@ -23,6 +23,17 @@ data class PredictionRecord(
     val matchDate: String = ""
 )
 
+data class MarketPerformanceStats(
+    val market: String,
+    val settled: Int,
+    val wins: Int,
+    val losses: Int,
+    val winRate: Double,
+    val totalStake: Double,
+    val totalProfit: Double,
+    val roi: Double
+)
+
 data class PerformanceStats(
     val total: Int,
     val settled: Int,
@@ -189,6 +200,29 @@ object PredictionPerformance {
             BTTS_NO -> home == 0 || away == 0
             else -> null
         }
+    }
+
+    fun getMarketStats(records: List<PredictionRecord>): List<MarketPerformanceStats> {
+        return records
+            .filter { it.settled }
+            .groupBy { it.market }
+            .map { (market, entries) ->
+                val wins = entries.count { it.won == true }
+                val losses = entries.count { it.won == false }
+                val stake = entries.sumOf { it.stake }
+                val profit = entries.sumOf { it.profit }
+                MarketPerformanceStats(
+                    market = market,
+                    settled = entries.size,
+                    wins = wins,
+                    losses = losses,
+                    winRate = if (entries.isEmpty()) 0.0 else wins * 100.0 / entries.size,
+                    totalStake = stake,
+                    totalProfit = profit,
+                    roi = if (stake == 0.0) 0.0 else profit / stake * 100.0
+                )
+            }
+            .sortedByDescending { it.settled }
     }
 
     fun getStats(context: Context): PerformanceStats {

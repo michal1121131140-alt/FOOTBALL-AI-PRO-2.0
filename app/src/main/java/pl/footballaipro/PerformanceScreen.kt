@@ -173,6 +173,32 @@ fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
                 Text("Rozliczone typy: ${stats.settled}")
             }
         }
+        val marketStats = remember(records.value) {
+            PredictionPerformance.getMarketStats(records.value)
+        }
+        if (marketStats.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                "SKUTECZNOŚĆ WEDŁUG RYNKU",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    marketStats.forEach { market ->
+                        Text(
+                            "${market.market}: ${market.wins}/${market.settled} trafień • " +
+                                "${format(market.winRate)}% • ROI ${format(market.roi)}% • " +
+                                "${format(market.totalProfit)}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Text("HISTORIA TYPÓW", style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold)
