@@ -1,5 +1,6 @@
 package pl.footballaipro
 
+import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -56,12 +57,26 @@ data class ApiFootballOdds(
 object ApiFootballRepository {
     private const val BASE_URL = "https://v3.football.api-sports.io"
 
-    private fun request(apiKey: String, path: String, query: Map<String, String> = emptyMap()): JSONObject {
+    private fun request(context: Context, apiKey: String, path: String, query: Map<String, String> = emptyMap()): JSONObject {
         require(apiKey.isNotBlank()) { "Dodaj klucz API-Football w ustawieniach." }
         val queryString = query.entries.joinToString("&") { (key, value) ->
             "${encode(key)}=${encode(value)}"
         }
         val fullUrl = BASE_URL + path + if (queryString.isNotEmpty()) "?$queryString" else ""
+        val cache = context.getSharedPreferences("api_football_response_cache", Context.MODE_PRIVATE)
+        val cacheKey = "response_" + (path + "?" + queryString).hashCode()
+        val cachedAt = cache.getLong(cacheKey + "_time", 0L)
+        val cacheTtl = when (path) {
+            "/leagues" -> 24L * 60L * 60L * 1000L
+            "/fixtures" -> 15L * 60L * 1000L
+            "/odds" -> 3L * 60L * 60L * 1000L
+            else -> 6L * 60L * 60L * 1000L
+        }
+        if (System.currentTimeMillis() - cachedAt in 0..cacheTtl) {
+            cache.getString(cacheKey, null)?.let { cached ->
+                runCatching { return JSONObject(cached) }
+            }
+        }
         val connection = (URL(fullUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
@@ -95,10 +110,14 @@ object ApiFootballRepository {
                 .joinToString("; ")
             throw IllegalStateException("Błąd API-Football: $details")
         }
+        cache.edit()
+            .putString(cacheKey, body)
+            .putLong(cacheKey + "_time", System.currentTimeMillis())
+            .apply()
         return json
     }
 
-    fun fetchCurrentLeagues(apiKey: String, season: Int): List<ApiFootballLeague> {
+    fun fetchCurrentLeagues(context: Context, apiKey: String, season: Int): List<ApiFootballLeague> {
         val leagues = mutableListOf<ApiFootballLeague>()
         var page = 1
         var totalPages = 1
@@ -131,6 +150,7 @@ object ApiFootballRepository {
     }
 
     fun fetchFixtures(
+        context: Context,
         apiKey: String,
         date: String,
         leagueId: Int? = null,
@@ -147,7 +167,7 @@ object ApiFootballRepository {
         do {
             val query = baseQuery.toMutableMap()
             query["page"] = page.toString()
-            val payload = request(apiKey, "/fixtures", query)
+            val payload = request(context, apiKey, "/fixtures", query)
             totalPages = payload.optJSONObject("paging")?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
             val response = payload.optJSONArray("response") ?: JSONArray()
             for (i in 0 until response.length()) {
@@ -184,9 +204,9 @@ object ApiFootballRepository {
         return fixtures.distinctBy { it.id }.sortedBy { it.date }
     }
 
-    fun fetchPredictions(apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
+    fun fetchPredictions(context: Context, apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
         val response = request(
-            apiKey, "/predictions", mapOf("fixture" to fixtureId.toString())
+            context, apiKey, "/predictions", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: return null
         val item = response.optJSONObject(0) ?: return null
         val predictions = item.optJSONObject("predictions") ?: JSONObject()
@@ -210,9 +230,9 @@ object ApiFootballRepository {
         )
     }
 
-    fun fetchInjuries(apiKey: String, fixtureId: Int): List<ApiFootballInjury> {
+    fun fetchInjuries(context: Context, apiKey: String, fixtureId: Int): List<ApiFootballInjury> {
         val response = request(
-            apiKey, "/injuries", mapOf("fixture" to fixtureId.toString())
+            context, apiKey, "/injuries", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: JSONArray()
         val result = mutableListOf<ApiFootballInjury>()
         for (i in 0 until response.length()) {
@@ -231,9 +251,9 @@ object ApiFootballRepository {
         return result
     }
 
-    fun fetchOdds(apiKey: String, fixtureId: Int): List<ApiFootballOdds> {
+    fun fetchOdds(context: Context, apiKey: String, fixtureId: Int): List<ApiFootballOdds> {
         val response = request(
-            apiKey, "/odds", mapOf("fixture" to fixtureId.toString())
+            context, apiKey, "/odds", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: JSONArray()
         val result = mutableListOf<ApiFootballOdds>()
         for (i in 0 until response.length()) {
