@@ -324,6 +324,13 @@ fun ApiFootballScreen(context: Context) {
                 Text("ANALIZA MECZU", color = ApiBlue, fontWeight = FontWeight.Bold)
                 Text(fixture.home + " — " + fixture.away, color = ApiWhite, fontWeight = FontWeight.Bold)
                 Text(fixture.leagueName + " • " + fixture.date + " " + fixture.time, color = ApiMuted, fontSize = 11.sp)
+                Text(
+                    if (fixture.score == "Nie rozegrano") fixtureStatusLabel(fixture.status)
+                    else "Wynik: " + fixture.score + " • " + fixtureStatusLabel(fixture.status),
+                    color = ApiGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
 
                 if (research == null) {
                     Button(
