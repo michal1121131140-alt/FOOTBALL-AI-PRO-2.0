@@ -21,8 +21,10 @@ object HeadToHeadAnalyzer {
 
         val previousMatches = matches
             .filter {
-                (it.home == homeTeam && it.away == awayTeam) ||
-                (it.home == awayTeam && it.away == homeTeam)
+                (it.home.equals(homeTeam, ignoreCase = true) &&
+                    it.away.equals(awayTeam, ignoreCase = true)) ||
+                (it.home.equals(awayTeam, ignoreCase = true) &&
+                    it.away.equals(homeTeam, ignoreCase = true))
             }
             .sortedByDescending { it.date }
             .take(limit)
@@ -35,18 +37,14 @@ object HeadToHeadAnalyzer {
         var validMatches = 0
 
         for (match in previousMatches) {
-            val score = match.score
-                .split("-", ":", "–")
-
-            if (score.size < 2) continue
-
-            val first = score[0].trim().toIntOrNull() ?: continue
-            val second = score[1].trim().toIntOrNull() ?: continue
+            val score = FootballScoreParser.parse(match.score) ?: continue
+            val first = score.home
+            val second = score.away
 
             val homeScore: Int
             val awayScore: Int
 
-            if (match.home == homeTeam) {
+            if (match.home.equals(homeTeam, ignoreCase = true)) {
                 homeScore = first
                 awayScore = second
             } else {
