@@ -350,6 +350,7 @@ fun FootballApp(
             ) {
                 listOf(
                     "MECZE",
+                    "GLOBAL",
                     "TOP",
                     "TABELA",
                     "ANALIZA",
@@ -375,6 +376,10 @@ fun FootballApp(
             Spacer(Modifier.height(14.dp))
 
             when (screen) {
+                "GLOBAL" -> {
+                    ApiFootballScreen(context = context)
+                }
+
                 "MECZE" -> {
                     Text("WYBIERZ LIGĘ", color = Muted, fontSize = 12.sp)
 
