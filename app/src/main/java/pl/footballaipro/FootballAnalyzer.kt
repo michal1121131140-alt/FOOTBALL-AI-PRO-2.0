@@ -79,7 +79,9 @@ object FootballAnalyzer {
             .coerceIn(0.15, 5.0)
 
         // Forma z ostatnich spotkań: maksymalna korekta około 8%.
-        if (homeForm != null && awayForm != null) {
+        if (homeForm != null && awayForm != null &&
+            homeForm.formRating.isFinite() && awayForm.formRating.isFinite()
+        ) {
             val formEdge = (
                 (homeForm.formRating - awayForm.formRating) / 100.0 * 0.08
             ).coerceIn(-0.08, 0.08)
@@ -137,18 +139,26 @@ object FootballAnalyzer {
         }
 
         // Wiarygodność opisuje ilość danych, nie gwarancję trafienia.
-        val homeSample = min(home.matchesPlayed, 20).toDouble() / 20.0
-        val awaySample = min(away.matchesPlayed, 20).toDouble() / 20.0
+        val homeSample = min(home.matchesPlayed.coerceAtLeast(0), 20).toDouble() / 20.0
+        val awaySample = min(away.matchesPlayed.coerceAtLeast(0), 20).toDouble() / 20.0
         var reliability = ((homeSample + awaySample) / 2.0) * 100.0
 
-        if (home.homeMatchesPlayed >= 3 && away.awayMatchesPlayed >= 3) {
+        val hasHomeSplit = home.homeMatchesPlayed >= 3 &&
+            home.homeGoalsScored?.let { it.isFinite() && it >= 0.0 } == true &&
+            home.homeGoalsConceded?.let { it.isFinite() && it >= 0.0 } == true
+        val hasAwaySplit = away.awayMatchesPlayed >= 3 &&
+            away.awayGoalsScored?.let { it.isFinite() && it >= 0.0 } == true &&
+            away.awayGoalsConceded?.let { it.isFinite() && it >= 0.0 } == true
+        if (hasHomeSplit && hasAwaySplit) {
             reliability = (reliability + 5.0).coerceAtMost(100.0)
         }
         if (homeForm != null && awayForm != null &&
+            homeForm.formRating.isFinite() && awayForm.formRating.isFinite() &&
             homeForm.lastResults.size >= 3 && awayForm.lastResults.size >= 3
         ) {
             reliability = (reliability + 5.0).coerceAtMost(100.0)
         }
+        reliability = reliability.coerceIn(0.0, 100.0)
 
         return MatchPrediction(
             homeWin = percent(homeWin),
@@ -182,10 +192,15 @@ object FootballAnalyzer {
         totalGoals: Double,
         totalMatches: Int
     ): Double {
-        if (splitGoals != null && splitMatches >= 3) {
-            return splitGoals / splitMatches
+        if (splitGoals != null && splitMatches >= 3 &&
+            splitGoals.isFinite() && splitGoals >= 0.0
+        ) {
+            return (splitGoals / splitMatches).coerceIn(0.0, 5.0)
         }
-        return if (totalMatches <= 0) 1.2 else totalGoals / totalMatches
+        if (totalMatches > 0 && totalGoals.isFinite() && totalGoals >= 0.0) {
+            return (totalGoals / totalMatches).coerceIn(0.0, 5.0)
+        }
+        return 1.2
     }
 
     private fun poisson(goals: Int, expected: Double): Double {
@@ -201,5 +216,5 @@ object FootballAnalyzer {
     }
 
     private fun percent(value: Double): Double =
-        (value * 100.0).coerceIn(0.0, 100.0)
+        if (value.isFinite()) (value * 100.0).coerceIn(0.0, 100.0) else 0.0
 }

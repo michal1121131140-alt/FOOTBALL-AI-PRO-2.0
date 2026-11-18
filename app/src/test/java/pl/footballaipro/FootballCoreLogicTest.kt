@@ -86,6 +86,65 @@ class FootballCoreLogicTest {
         })
     }
 
+
+    @Test
+    fun malformedTeamStatisticsNeverProduceNonFinitePredictions() {
+        val home = TeamStats(
+            teamName = "Alpha",
+            matchesPlayed = -5,
+            goalsScored = Double.NaN,
+            goalsConceded = -10.0,
+            wins = 0,
+            draws = 0,
+            losses = 0,
+            homeMatchesPlayed = 10,
+            homeGoalsScored = Double.POSITIVE_INFINITY,
+            homeGoalsConceded = -2.0
+        )
+        val away = TeamStats(
+            teamName = "Beta",
+            matchesPlayed = 0,
+            goalsScored = Double.NEGATIVE_INFINITY,
+            goalsConceded = Double.NaN,
+            wins = 0,
+            draws = 0,
+            losses = 0,
+            awayMatchesPlayed = 10,
+            awayGoalsScored = Double.NaN,
+            awayGoalsConceded = Double.POSITIVE_INFINITY
+        )
+        val invalidForm = TeamForm(
+            teamName = "Alpha",
+            lastResults = listOf("W", "W", "W"),
+            wins = 3,
+            draws = 0,
+            losses = 0,
+            points = 9,
+            formRating = Double.NaN,
+            currentStreak = "3 × W"
+        )
+
+        val prediction = FootballAnalyzer.calculate(
+            home,
+            away,
+            homeForm = invalidForm,
+            awayForm = invalidForm,
+            h2h = HeadToHeadStats(4, 99, -20, 0, 0, 0, 0.0)
+        )
+
+        val probabilities = listOf(
+            prediction.homeWin, prediction.draw, prediction.awayWin,
+            prediction.over15, prediction.over25, prediction.over35,
+            prediction.under25, prediction.bttsYes, prediction.bttsNo,
+            prediction.dataReliability
+        )
+        assertTrue(probabilities.all { it.isFinite() && it in 0.0..100.0 })
+        assertEquals(100.0, prediction.homeWin + prediction.draw + prediction.awayWin, 0.05)
+        assertTrue(prediction.expectedHomeGoals.isFinite())
+        assertTrue(prediction.expectedAwayGoals.isFinite())
+        assertTrue(prediction.mostLikelyScores.all { it.probabilityPercent.isFinite() })
+    }
+
     @Test
     fun valueBettingCalculatesPositiveAndNegativeExpectedValue() {
         val positive = ValueBetting.calculate(60.0, 2.0)
