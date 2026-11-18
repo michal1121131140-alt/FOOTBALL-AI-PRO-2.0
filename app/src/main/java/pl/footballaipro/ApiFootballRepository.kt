@@ -146,7 +146,7 @@ object ApiFootballRepository {
                 }
             }
             page++
-        } while (page <= totalPages && page <= 10)
+        } while (page <= totalPages && page <= 100)
         return leagues.distinctBy { it.id }.sortedWith(compareBy({ it.country }, { it.name }))
     }
 
@@ -201,7 +201,7 @@ object ApiFootballRepository {
                 )
             }
             page++
-        } while (page <= totalPages && page <= 10)
+        } while (page <= totalPages && page <= 100)
         return fixtures.distinctBy { it.id }.sortedBy { it.date }
     }
 
