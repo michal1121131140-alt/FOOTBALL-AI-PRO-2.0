@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,9 +42,15 @@ fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
     var backtest by remember {
         mutableStateOf(BacktestSummary(0, 0, 0, 0.0, 0.0))
     }
+    var backtestLoading by remember { mutableStateOf(true) }
     LaunchedEffect(seasonMatches) {
-        backtest = withContext(Dispatchers.Default) {
-            PredictionBacktest.run(seasonMatches)
+        backtestLoading = true
+        try {
+            backtest = withContext(Dispatchers.Default) {
+                PredictionBacktest.run(seasonMatches)
+            }
+        } finally {
+            backtestLoading = false
         }
     }
 
@@ -75,16 +82,33 @@ fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
                 verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 Text("TEST HISTORYCZNY MODELU", fontWeight = FontWeight.Bold)
-                Text("Sprawdzone mecze: ${backtest.testedMatches}")
-                Text("Pominięte mecze: ${backtest.skippedMatches}")
-                Text(
-                    "Trafione wskazania 1X2: ${backtest.correctPredictions} / ${backtest.testedMatches}"
-                )
-                Text(
-                    "Skuteczność 1X2: ${format(backtest.accuracy)}%",
-                    fontWeight = FontWeight.Bold
-                )
-                Text("Średni Brier Score: ${format(backtest.averageBrierScore)}")
+                when {
+                    seasonMatches.isEmpty() -> {
+                        Text("Załaduj mecze ligi i sezonu w zakładce MECZE, aby uruchomić test.")
+                    }
+                    backtestLoading -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator()
+                            Text("Obliczanie testu historycznego w tle...")
+                        }
+                    }
+                    backtest.testedMatches == 0 -> {
+                        Text("Za mało wcześniejszych wyników, aby rzetelnie przetestować prognozy.")
+                        Text("Pominięte mecze: ${backtest.skippedMatches}")
+                    }
+                    else -> {
+                        Text("Sprawdzone mecze: ${backtest.testedMatches}")
+                        Text("Pominięte mecze: ${backtest.skippedMatches}")
+                        Text(
+                            "Trafione wskazania 1X2: ${backtest.correctPredictions} / ${backtest.testedMatches}"
+                        )
+                        Text(
+                            "Skuteczność 1X2: ${format(backtest.accuracy)}%",
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text("Średni Brier Score: ${format(backtest.averageBrierScore)}")
+                    }
+                }
                 Text(
                     "Test wykorzystuje wyłącznie wcześniejsze wyniki z aktualnie załadowanej ligi i sezonu.",
                     style = MaterialTheme.typography.bodySmall
