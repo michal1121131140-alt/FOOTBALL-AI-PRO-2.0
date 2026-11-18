@@ -157,6 +157,14 @@ class FootballCoreTest {
         assertEquals(0.0, stats.roi, 0.0001)
     }
 
+    @Test
+    fun globalFixtureStatusesAreTranslatedToPolish() {
+        assertEquals("Nie rozpoczęto", fixtureStatusLabel("NS"))
+        assertEquals("Koniec meczu", fixtureStatusLabel("FT"))
+        assertEquals("Mecz przełożony", fixtureStatusLabel("PST"))
+        assertEquals("Brak statusu", fixtureStatusLabel(""))
+    }
+
     private fun match(
         home: String,
         away: String,
