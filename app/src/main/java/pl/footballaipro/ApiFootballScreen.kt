@@ -187,46 +187,90 @@ fun ApiFootballScreen(context: Context) {
             }
         }
 
-        Button(
-            onClick = {
-                if (apiKey.isBlank()) {
-                    status = "Wpisz klucz API-Football."
-                } else if (!FootballDateValidator.isValid(date)) {
-                    status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
-                } else {
-                    val keyForRequest = apiKey.trim()
-                    val requestedDate = date
-                    val leagueFilter = selectedLeague
-                    loading = true
-                    selected = null
-                    research = null
-                    status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
-                    thread {
-                        try {
-                            val result = ApiFootballRepository.fetchFixtures(
-                                context,
-                                keyForRequest,
-                                requestedDate,
-                                leagueId = leagueFilter?.id,
-                                season = leagueFilter?.season
-                            )
-                            Handler(Looper.getMainLooper()).post {
-                                fixtures = result
-                                status = if (result.isEmpty()) "Brak spotkań w bazie dla tej daty." else "Znaleziono spotkań: " + result.size
-                                loading = false
-                            }
-                        } catch (e: Exception) {
-                            Handler(Looper.getMainLooper()).post {
-                                status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
-                                loading = false
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else if (!FootballDateValidator.isValid(date)) {
+                        status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val requestedDate = date
+                        val leagueFilter = selectedLeague
+                        loading = true
+                        selected = null
+                        research = null
+                        fixtures = emptyList()
+                        status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchFixtures(
+                                    context,
+                                    keyForRequest,
+                                    requestedDate,
+                                    leagueId = leagueFilter?.id,
+                                    season = leagueFilter?.season
+                                )
+                                Handler(Looper.getMainLooper()).post {
+                                    fixtures = result
+                                    status = if (result.isEmpty()) {
+                                        "Brak spotkań w bazie dla tej daty."
+                                    } else "Znaleziono spotkań: " + result.size
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
+                                    loading = false
+                                }
                             }
                         }
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
-        ) { Text("POBIERZ WSZYSTKIE MECZE") }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
+            ) { Text("MECZE Z DATY", fontSize = 11.sp) }
+
+            Button(
+                onClick = {
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val leagueFilter = selectedLeague
+                        loading = true
+                        selected = null
+                        research = null
+                        fixtures = emptyList()
+                        status = "Pobieram wyniki na żywo..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchLiveFixtures(
+                                    context,
+                                    keyForRequest,
+                                    leagueId = leagueFilter?.id
+                                )
+                                Handler(Looper.getMainLooper()).post {
+                                    fixtures = result
+                                    status = if (result.isEmpty()) {
+                                        "Brak trwających spotkań w dostępnych ligach."
+                                    } else "Spotkania na żywo: " + result.size + " • odświeżanie ręczne"
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    status = "Błąd pobierania live: " + (e.message ?: "nieznany błąd")
+                                    loading = false
+                                }
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
+            ) { Text("NA ŻYWO", fontSize = 11.sp) }
+        }
 
         Text(status, color = ApiMuted, fontSize = 11.sp)
         if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ApiBlue)
