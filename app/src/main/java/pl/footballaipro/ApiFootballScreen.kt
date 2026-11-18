@@ -224,7 +224,7 @@ fun ApiFootballScreen(context: Context) {
                             },
                             onClick = {
                                 selectedLeague = league
-                                selectedSeason = league.seasons.firstOrNull() ?: league.season
+                                selectedSeason = league.season
                                 standings = emptyList()
                                 fixtures = emptyList()
                                 selected = null
