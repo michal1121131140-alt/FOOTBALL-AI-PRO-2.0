@@ -42,11 +42,16 @@ private data class FixtureResearch(
 @Composable
 fun ApiFootballScreen(
     context: Context,
+    selectedDate: String,
+    onDateChanged: (String) -> Unit,
     onFixturesLoaded: (List<FootballMatch>) -> Unit = {},
     onSeasonMatchesLoaded: (List<FootballMatch>) -> Unit = {}
 ) {
     var apiKey by remember { mutableStateOf(ApiFootballSettings.getApiKey(context)) }
-    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())) }
+    var date by remember { mutableStateOf(selectedDate) }
+    LaunchedEffect(selectedDate) {
+        date = selectedDate
+    }
     var fixtures by remember { mutableStateOf(emptyList<ApiFootballFixture>()) }
     var selected by remember { mutableStateOf<ApiFootballFixture?>(null) }
     var research by remember { mutableStateOf<FixtureResearch?>(null) }
@@ -187,6 +192,7 @@ fun ApiFootballScreen(
             value = date,
             onValueChange = {
                 date = it
+                onDateChanged(it)
                 onFixturesLoaded(emptyList())
             },
             modifier = Modifier.fillMaxWidth(),
