@@ -78,6 +78,11 @@ fun ApiFootballScreen(context: Context) {
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("GLOBALNE MECZE I ANALIZA", color = ApiWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text("Mecze ze wszystkich rozgrywek dostępnych w bazie API-Football.", color = ApiMuted, fontSize = 11.sp)
+        Text(
+            "Prognozy i kursy mają charakter informacyjny. Nie gwarantują wygranej; zakłady wiążą się z ryzykiem utraty pieniędzy. Tylko 18+.",
+            color = ApiMuted,
+            fontSize = 10.sp
+        )
 
         OutlinedTextField(
             value = apiKey,
