@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -63,11 +64,31 @@ fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(12.dp))
-        Button(
-            onClick = { records.value = PredictionPerformance.getAll(context) },
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("ODŚWIEŻ STATYSTYKI")
+            Button(
+                onClick = { records.value = PredictionPerformance.getAll(context) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("ODŚWIEŻ")
+            }
+            Button(
+                onClick = {
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_SUBJECT, "FOOTBALL AI PRO — historia typów")
+                        putExtra(Intent.EXTRA_TEXT, PredictionPerformance.exportCsv(context))
+                    }
+                    context.startActivity(
+                        Intent.createChooser(shareIntent, "Eksportuj historię typów")
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("EKSPORT CSV")
+            }
         }
         Spacer(modifier = Modifier.height(12.dp))
 
