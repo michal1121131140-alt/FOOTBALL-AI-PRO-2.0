@@ -78,7 +78,7 @@ object ApiFootballRepository {
         val credentialFingerprint = MessageDigest.getInstance("SHA-256")
             .digest(apiKey.toByteArray(Charsets.UTF_8))
             .take(8)
-            .joinToString("") { byte -> "%02x".format(byte) }
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         val cacheKey = "response_" + credentialFingerprint + "_" +
             (path + "?" + queryString).hashCode()
         val cachedAt = cache.getLong(cacheKey + "_time", 0L)
