@@ -53,6 +53,7 @@ fun ApiFootballScreen(context: Context) {
     var leagueMenuExpanded by remember { mutableStateOf(false) }
     var leagueQuery by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var stakeInput by remember { mutableStateOf("1.00") }
     val filteredLeagues = remember(availableLeagues, leagueQuery) {
         val query = leagueQuery.trim()
         if (query.isBlank()) availableLeagues else availableLeagues.filter { league ->
@@ -379,6 +380,14 @@ fun ApiFootballScreen(context: Context) {
                     }
 
                     Text("KURSY BUKMACHERSKIE", color = ApiBlue, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = stakeInput,
+                        onValueChange = { stakeInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Stawka do zapisania typu") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
                     val marketOdds = data.odds.filter {
                         it.market.contains("match winner", true) ||
                         it.market.contains("1x2", true) ||
@@ -407,7 +416,48 @@ fun ApiFootballScreen(context: Context) {
                             val value = if (probability != null && decimalOdd != null && decimalOdd > 1.0) {
                                 runCatching { ValueBetting.calculate(probability, decimalOdd) }.getOrNull()
                             } else null
+                            val betSelection = when (key) {
+                                "home" -> PredictionPerformance.HOME_WIN
+                                "draw" -> PredictionPerformance.DRAW
+                                "away" -> PredictionPerformance.AWAY_WIN
+                                else -> null
+                            }
                             Text(odd.bookmaker + " • " + odd.selection + ": " + odd.odd, color = ApiWhite, fontSize = 11.sp)
+                            if (
+                                value != null && betSelection != null &&
+                                probability != null && decimalOdd != null
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val stake = stakeInput.replace(",", ".").toDoubleOrNull()
+                                        if (stake == null || stake <= 0.0 || !stake.isFinite()) {
+                                            status = "Podaj prawidłową stawkę większą od zera."
+                                        } else {
+                                            val matchRecord = FootballMatch(
+                                                league = fixture.leagueName,
+                                                home = fixture.home,
+                                                away = fixture.away,
+                                                score = fixture.score,
+                                                date = fixture.date,
+                                                source = "API-Football"
+                                            )
+                                            val record = PredictionPerformance.createRecord(
+                                                match = matchRecord,
+                                                selection = betSelection,
+                                                odds = decimalOdd,
+                                                probability = probability,
+                                                stake = stake
+                                            )
+                                            PredictionPerformance.save(context, record)
+                                            status = "Typ zapisany w historii: ${fixture.home} — ${fixture.away}."
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
+                                ) {
+                                    Text("ZAPISZ TYP DO HISTORII")
+                                }
+                            }
                             if (value != null) {
                                 Text(
                                     "Model: " + String.format(Locale.US, "%.1f%%", value.modelProbability) +
