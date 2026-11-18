@@ -98,6 +98,7 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
             ) { Text("ZAPISZ", fontSize = 10.sp) }
@@ -118,6 +119,7 @@ fun ApiFootballScreen(context: Context) {
                     status = "Klucz API i lokalny cache zostały usunięte."
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
             ) { Text("USUŃ KLUCZ", fontSize = 10.sp) }
