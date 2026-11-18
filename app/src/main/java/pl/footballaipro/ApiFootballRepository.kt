@@ -66,6 +66,26 @@ data class ApiFootballOdds(
     val odd: String
 )
 
+internal fun apiHttpErrorMessage(statusCode: Int, payload: JSONObject?): String {
+    val details = payload?.optJSONObject("errors")?.let { errors ->
+        errors.keys().asSequence()
+            .map { key -> "$key: ${errors.opt(key)}" }
+            .joinToString("; ")
+            .takeIf { it.isNotBlank() }
+    } ?: payload?.optString("message")?.takeIf { it.isNotBlank() }
+
+    val explanation = when (statusCode) {
+        400 -> "Nieprawidłowe parametry zapytania."
+        401 -> "Klucz API-Football jest nieprawidłowy lub nieaktywny."
+        403 -> "Plan API nie pozwala na pobranie tych danych."
+        404 -> "Nie znaleziono żądanego zasobu."
+        429 -> "Przekroczono limit zapytań API. Spróbuj później."
+        in 500..599 -> "Serwer API-Football ma chwilowy problem."
+        else -> "API-Football zwróciło błąd HTTP $statusCode."
+    }
+    return if (details != null) "$explanation Szczegóły: $details" else explanation
+}
+
 /**
  * API-Football v3 integration.
  * All requests are explicit and user-triggered; the caller should cache results
@@ -118,8 +138,10 @@ object ApiFootballRepository {
             setRequestProperty("User-Agent", "FootballAIPro/2.0")
         }
 
+        val responseCode: Int
         val body = try {
-            val stream = if (connection.responseCode in 200..299) {
+            responseCode = connection.responseCode
+            val stream = if (responseCode in 200..299) {
                 connection.inputStream
             } else {
                 connection.errorStream
@@ -132,7 +154,14 @@ object ApiFootballRepository {
         val json = try {
             JSONObject(body)
         } catch (_: Exception) {
+            if (responseCode !in 200..299) {
+                throw IllegalStateException(apiHttpErrorMessage(responseCode, null))
+            }
             throw IllegalStateException("API-Football zwróciło nieprawidłową odpowiedź.")
+        }
+
+        if (responseCode !in 200..299) {
+            throw IllegalStateException(apiHttpErrorMessage(responseCode, json))
         }
 
         val errors = json.optJSONObject("errors")
