@@ -158,6 +158,15 @@ class FootballCoreTest {
     }
 
     @Test
+    fun apiHttpErrorsExplainAuthenticationQuotaAndServerFailures() {
+        assertTrue(apiHttpErrorMessage(401, null).contains("Klucz API"))
+        assertTrue(apiHttpErrorMessage(403, null).contains("Plan API"))
+        assertTrue(apiHttpErrorMessage(429, null).contains("limit zapytań"))
+        assertTrue(apiHttpErrorMessage(503, null).contains("Serwer API"))
+        assertTrue(apiHttpErrorMessage(418, null).contains("HTTP 418"))
+    }
+
+    @Test
     fun globalFixtureStatusesAreTranslatedToPolish() {
         assertEquals("Nie rozpoczęto", fixtureStatusLabel("NS"))
         assertEquals("Koniec meczu", fixtureStatusLabel("FT"))
