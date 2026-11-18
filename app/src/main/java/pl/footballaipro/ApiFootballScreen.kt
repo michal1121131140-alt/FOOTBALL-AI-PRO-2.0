@@ -539,8 +539,14 @@ fun ApiFootballScreen(
                                                 )
                                             })
                                         }
-                                        status = "Sezon: ${converted.size} spotkań • mecze ${requestedDate}: ${dailyResult.size} • rozliczono typów: ${settledCount}." +
-                                            (dailyError?.let { " Nie udało się pobrać meczów dnia: $it" } ?: " Dane są dostępne w TOP i teście historycznym.")
+                                        status = "Sezon: ${converted.size} spotkań • rozliczono typów: ${settledCount}. " +
+                                            if (date != requestedDate) {
+                                                "Data została zmieniona — pobierz mecze dnia ponownie."
+                                            } else {
+                                                "Mecze ${requestedDate}: ${dailyResult.size}. " +
+                                                    (dailyError?.let { "Błąd pobierania meczów dnia: $it" }
+                                                        ?: "Dane są dostępne w TOP i teście historycznym.")
+                                            }
                                     }
                                     loading = false
                                 }
