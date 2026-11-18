@@ -6,7 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.security.MessageDigest
 
 data class ApiFootballLeague(
@@ -108,7 +109,11 @@ object ApiFootballRepository {
     }
 
     private fun requireValidDate(date: String) {
-        require(runCatching { LocalDate.parse(date) }.isSuccess) {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            isLenient = false
+        }
+        val parsed = runCatching { formatter.parse(date) }.getOrNull()
+        require(parsed != null && formatter.format(parsed) == date) {
             "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
         }
     }
