@@ -488,7 +488,6 @@ fun ApiFootballScreen(
                         val leagueForRequest = league
                         val seasonForRequest = selectedSeason ?: league.season
                         loading = true
-                        onSeasonMatchesLoaded(emptyList())
                         status = "Pobieram cały sezon ${league.name} ${seasonForRequest} do TOP i testu historycznego..."
                         thread {
                             try {
