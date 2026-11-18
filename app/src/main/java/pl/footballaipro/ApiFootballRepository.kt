@@ -110,12 +110,16 @@ object ApiFootballRepository {
         val cache = context.getSharedPreferences("api_football_response_cache", Context.MODE_PRIVATE)
         // Keep cached responses separate when the user changes API credentials.
         // Only a short SHA-256 fingerprint is stored; the API key itself is not.
-        val credentialFingerprint = MessageDigest.getInstance("SHA-256")
-            .digest(apiKey.toByteArray(Charsets.UTF_8))
-            .take(8)
-            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        val cacheKey = "response_" + credentialFingerprint + "_" +
-            (path + "?" + queryString).hashCode()
+        val sha256 = MessageDigest.getInstance("SHA-256")
+        fun fingerprint(value: String): String =
+            sha256.digest(value.toByteArray(Charsets.UTF_8))
+                .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+
+        // Hash the complete request identity instead of String.hashCode(), which is
+        // only 32-bit and can collide for different leagues, seasons or dates.
+        val credentialFingerprint = fingerprint(apiKey).take(32)
+        val requestFingerprint = fingerprint(path + "?" + queryString)
+        val cacheKey = "response_" + credentialFingerprint + "_" + requestFingerprint
         val cachedAt = cache.getLong(cacheKey + "_time", 0L)
         val cacheTtl = when {
             path == "/fixtures" && queryString.contains("live=all") -> 30L * 1000L
