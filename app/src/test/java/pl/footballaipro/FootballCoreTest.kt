@@ -216,8 +216,8 @@ class FootballCoreTest {
             limit = 10
         ).associateBy { it.match.league }
 
-        assertEquals(70.0, ranked["League One"]?.prediction?.homeWin)
-        assertEquals(15.0, ranked["League Two"]?.prediction?.homeWin)
+        assertEquals(70.0, ranked["League One"]?.prediction?.homeWin ?: -1.0, 0.0001)
+        assertEquals(15.0, ranked["League Two"]?.prediction?.homeWin ?: -1.0, 0.0001)
     }
 
     @Test
