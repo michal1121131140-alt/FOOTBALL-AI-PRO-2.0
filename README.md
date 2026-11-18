@@ -9,11 +9,12 @@ Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny pr
 - Dokładniejszy test historyczny: dopasowanie nazw drużyn bez rozróżniania wielkości liter i testy minimalnej liczby wcześniejszych spotkań.
 - Bezpieczniejsza migracja starszych kluczy API: aplikacja nie wraca do używania klucza w postaci jawnego tekstu, gdy szyfrowanie się nie powiedzie.
 - Komunikaty o odpowiedzialnym korzystaniu z analiz i zakładów.
+- Integracja GLOBAL z TOP 10 i testem historycznym: pełny sezon wybranej ligi API-Football może zasilać formę, H2H, statystyki drużyn i prognozy; zakończone wyniki rozliczają zapisane typy.
 
 ## Funkcje
 
 - **Mecze i rozgrywki:** terminarze i wyniki z OpenLigaDB dla dostępnych tam lig.
-- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, filtrowanie po lidze, kraju i drużynie, wybór sezonu oraz ręczne odświeżanie wyników na żywo.
+- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, filtrowanie po lidze, kraju i drużynie, wybór sezonu oraz ręczne odświeżanie wyników na żywo. Przycisk „POBIERZ SEZON I MECZE DO TOP” ładuje historię wybranej ligi i bieżące mecze dnia, udostępniając dane zakładkom TOP 10, ANALIZA i STATYSTYKI.
 - **Tabele:** tabele OpenLigaDB oraz tabele API-Football dla wybranej ligi i sezonu.
 - **Analiza drużyn:** bilans, średnie goli, podział dom/wyjazd, ostatnia forma i H2H.
 - **Prognozy:** model Poissona dla 1X2, sumy goli i BTTS, a także pięć najbardziej prawdopodobnych dokładnych wyników.
