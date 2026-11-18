@@ -1,4 +1,4 @@
-# FOOTBALL AI PRO 2.0
+# FOOTBALL AI PRO 2.0.2
 
 Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny prawdopodobieństwa rynków bukmacherskich.
 
