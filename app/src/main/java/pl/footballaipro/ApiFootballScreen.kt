@@ -104,6 +104,8 @@ fun ApiFootballScreen(context: Context) {
                     availableLeagues = emptyList()
                     selectedLeague = null
                     leagueCount = null
+                    leagueQuery = ""
+                    searchQuery = ""
                     fixtures = emptyList()
                     selected = null
                     research = null
