@@ -300,8 +300,17 @@ fun FootballApp(
 
             if (homeStats != null && awayStats != null) {
                 try {
+                    val homeForm = formByTeam[match.home]
+                        ?: TeamFormAnalyzer.calculate(match.home, previous)
+                    val awayForm = formByTeam[match.away]
+                        ?: TeamFormAnalyzer.calculate(match.away, previous)
+                    val h2h = HeadToHeadAnalyzer.calculate(
+                        match.home, match.away, previous, 10
+                    )
                     (match.home + "|" + match.away) to
-                        FootballAnalyzer.calculate(homeStats, awayStats)
+                        FootballAnalyzer.calculate(
+                            homeStats, awayStats, homeForm, awayForm, h2h
+                        )
                 } catch (_: Exception) {
                     null
                 }
@@ -698,7 +707,21 @@ fun FootballApp(
                                         loadAnalysis(league, match) { result, error ->
                                             analysis = result
                                             prediction = result?.let {
-                                                FootballAnalyzer.calculate(it.home, it.away)
+                                                val previous = seasonMatches.filter {
+                                                    it.date < match.date
+                                                }
+                                                val homeForm = TeamFormAnalyzer.calculate(
+                                                    match.home, previous
+                                                )
+                                                val awayForm = TeamFormAnalyzer.calculate(
+                                                    match.away, previous
+                                                )
+                                                val h2h = HeadToHeadAnalyzer.calculate(
+                                                    match.home, match.away, previous, 10
+                                                )
+                                                FootballAnalyzer.calculate(
+                                                    it.home, it.away, homeForm, awayForm, h2h
+                                                )
                                             }
                                             status = error ?: "Analiza zakończona."
                                             analysisLoading = false
