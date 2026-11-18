@@ -20,6 +20,12 @@ data class TeamStats(
     val awayGoalsConceded: Double? = null
 )
 
+data class ScorelineProbability(
+    val homeGoals: Int,
+    val awayGoals: Int,
+    val probabilityPercent: Double
+)
+
 data class MatchPrediction(
     val homeWin: Double,
     val draw: Double,
@@ -32,7 +38,8 @@ data class MatchPrediction(
     val bttsNo: Double,
     val expectedHomeGoals: Double,
     val expectedAwayGoals: Double,
-    val dataReliability: Double = 0.0
+    val dataReliability: Double = 0.0,
+    val mostLikelyScores: List<ScorelineProbability> = emptyList()
 )
 
 object FootballAnalyzer {
@@ -99,10 +106,12 @@ object FootballAnalyzer {
         var over25 = 0.0
         var over35 = 0.0
         var btts = 0.0
+        val scorelineProbabilities = mutableListOf<Triple<Int, Int, Double>>()
 
         for (h in 0..12) {
             for (a in 0..12) {
                 val probability = poisson(h, homeExpected) * poisson(a, awayExpected)
+                scorelineProbabilities.add(Triple(h, a, probability))
                 when {
                     h > a -> homeWin += probability
                     h == a -> draw += probability
@@ -153,7 +162,17 @@ object FootballAnalyzer {
             bttsNo = percent(1.0 - btts),
             expectedHomeGoals = homeExpected,
             expectedAwayGoals = awayExpected,
-            dataReliability = reliability
+            dataReliability = reliability,
+            mostLikelyScores = scorelineProbabilities
+                .map { (homeGoals, awayGoals, probability) ->
+                    ScorelineProbability(
+                        homeGoals = homeGoals,
+                        awayGoals = awayGoals,
+                        probabilityPercent = percent(probability / total)
+                    )
+                }
+                .sortedByDescending { it.probabilityPercent }
+                .take(5)
         )
     }
 

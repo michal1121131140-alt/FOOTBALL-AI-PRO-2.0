@@ -801,6 +801,16 @@ fun FootballApp(
                                         "Wiarygodność danych: ${"%.0f".format(Locale.US, result.dataReliability)}%"
                                 )
 
+                                if (result.mostLikelyScores.isNotEmpty()) {
+                                    SectionTitle("NAJBARDZIEJ PRAWDOPODOBNE WYNIKI")
+                                    InfoCard(
+                                        result.mostLikelyScores.joinToString("\n") { score ->
+                                            "${score.homeGoals} : ${score.awayGoals} — " +
+                                                "${"%.1f".format(Locale.US, score.probabilityPercent)}%"
+                                        }
+                                    )
+                                }
+
                                 SectionTitle("VALUE BETTING")
                                 Text(
                                     "Wybierz rynek i wpisz kurs dziesiętny bukmachera.",
