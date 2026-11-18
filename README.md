@@ -11,7 +11,7 @@ Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny pr
 - **Prognozy:** model Poissona dla 1X2, sumy goli i BTTS, a także pięć najbardziej prawdopodobnych dokładnych wyników.
 - **TOP 10:** ranking spotkań na podstawie prognozy i wiarygodności danych.
 - **Value Betting:** porównanie prawdopodobieństwa modelu z kursem dziesiętnym.
-- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników, skuteczność, ROI, bilans, wyniki według rynku i eksport do CSV.
+- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników (również dla pobranych zakończonych meczów API-Football), skuteczność, ROI, bilans, wyniki według rynku i eksport do CSV.
 - **Test historyczny:** sprawdzanie prognoz na podstawie wcześniejszych wyników, bez wykorzystywania wyniku analizowanego meczu.
 - **Eksport danych:** eksport historii typów i zapisanych spotkań do CSV.
 
