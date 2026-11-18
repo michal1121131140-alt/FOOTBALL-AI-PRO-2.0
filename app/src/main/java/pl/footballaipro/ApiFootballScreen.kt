@@ -48,6 +48,9 @@ fun ApiFootballScreen(context: Context) {
     var loading by remember { mutableStateOf(false) }
     var showKey by remember { mutableStateOf(false) }
     var leagueCount by remember { mutableStateOf<Int?>(null) }
+    var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
+    var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
+    var leagueMenuExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val filteredFixtures = remember(fixtures, searchQuery) {
         val query = searchQuery.trim()
@@ -93,11 +96,13 @@ fun ApiFootballScreen(context: Context) {
                         thread {
                             try {
                                 val year = SimpleDateFormat("yyyy", Locale.US).format(Date()).toInt()
-                                val count = ApiFootballRepository.fetchCurrentLeagues(context, apiKey, year).size
+                                val result = ApiFootballRepository.fetchCurrentLeagues(context, apiKey, year)
                                 ApiFootballSettings.saveApiKey(context, apiKey)
                                 Handler(Looper.getMainLooper()).post {
-                                    leagueCount = count
-                                    status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + count
+                                    availableLeagues = result
+                                    leagueCount = result.size
+                                    selectedLeague = null
+                                    status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -122,6 +127,50 @@ fun ApiFootballScreen(context: Context) {
             label = { Text("Data (RRRR-MM-DD)") }
         )
 
+        if (availableLeagues.isNotEmpty()) {
+            Text("FILTR ROZGRYWEK", color = ApiMuted, fontSize = 10.sp)
+            Box {
+                Button(
+                    onClick = { leagueMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+                ) {
+                    val label = selectedLeague?.let {
+                        it.name + if (it.country.isNotBlank()) " • " + it.country else ""
+                    } ?: "Wszystkie ligi"
+                    Text(label, color = ApiWhite)
+                }
+                DropdownMenu(
+                    expanded = leagueMenuExpanded,
+                    onDismissRequest = { leagueMenuExpanded = false },
+                    modifier = Modifier.heightIn(max = 360.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Wszystkie ligi") },
+                        onClick = {
+                            selectedLeague = null
+                            leagueMenuExpanded = false
+                        }
+                    )
+                    availableLeagues.forEach { league ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    league.name + if (league.country.isNotBlank()) {
+                                        " • " + league.country
+                                    } else ""
+                                )
+                            },
+                            onClick = {
+                                selectedLeague = league
+                                leagueMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         Button(
             onClick = {
                 if (apiKey.isBlank()) {
@@ -132,10 +181,17 @@ fun ApiFootballScreen(context: Context) {
                     loading = true
                     selected = null
                     research = null
-                    status = "Pobieram spotkania ze wszystkich dostępnych lig..."
+                    status = "Pobieram spotkania: " + (selectedLeague?.name ?: "wszystkie ligi") + "..."
                     thread {
                         try {
-                            val result = ApiFootballRepository.fetchFixtures(context, apiKey, date)
+                            val leagueFilter = selectedLeague
+                            val result = ApiFootballRepository.fetchFixtures(
+                                context,
+                                apiKey,
+                                date,
+                                leagueId = leagueFilter?.id,
+                                season = leagueFilter?.season
+                            )
                             Handler(Looper.getMainLooper()).post {
                                 fixtures = result
                                 status = if (result.isEmpty()) "Brak spotkań w bazie dla tej daty." else "Znaleziono spotkań: " + result.size
