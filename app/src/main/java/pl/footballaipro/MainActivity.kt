@@ -1225,13 +1225,19 @@ fun TeamStatsCard(stats: TeamStats) {
     ) {
         Text(stats.teamName, color = White, fontWeight = FontWeight.Bold)
         Text("Rozegrane mecze: ${stats.matchesPlayed}", color = Muted)
+        val matchesPlayed = stats.matchesPlayed.coerceAtLeast(1)
         Text(
-            "Średnia strzelonych goli: ${"%.2f".format(Locale.US, stats.goalsScored)}",
+            "Średnia strzelonych goli: ${"%.2f".format(Locale.US, stats.goalsScored / matchesPlayed)}",
             color = Muted
         )
         Text(
-            "Średnia straconych goli: ${"%.2f".format(Locale.US, stats.goalsConceded)}",
+            "Średnia straconych goli: ${"%.2f".format(Locale.US, stats.goalsConceded / matchesPlayed)}",
             color = Muted
+        )
+        Text(
+            "Mecze u siebie / na wyjeździe: ${stats.homeMatchesPlayed} / ${stats.awayMatchesPlayed}",
+            color = Muted,
+            fontSize = 11.sp
         )
         Text(
             "Zwycięstwa: ${stats.wins} • Remisy: ${stats.draws} • Porażki: ${stats.losses}",
