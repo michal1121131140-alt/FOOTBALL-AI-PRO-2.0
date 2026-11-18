@@ -18,6 +18,25 @@ private val HISTORY_KEY = stringPreferencesKey("match_history")
 
 object FootballStorage {
 
+    fun exportHistoryCsv(matches: List<FootballMatch>): String {
+        fun cell(value: String): String =
+            "\"" + value.replace("\"", "\"\"") + "\""
+
+        val header = listOf("Liga", "Gospodarze", "Goście", "Data", "Wynik", "Źródło")
+            .joinToString(";")
+        val rows = matches.map { match ->
+            listOf(
+                match.league,
+                match.home,
+                match.away,
+                match.date,
+                match.score,
+                match.source
+            ).joinToString(";") { cell(it) }
+        }
+        return "\uFEFF" + (listOf(header) + rows).joinToString("\n")
+    }
+
     suspend fun saveHistory(
         context: Context,
         matches: List<FootballMatch>
