@@ -588,6 +588,15 @@ fun FootballApp(
                         InfoCard("Brak spotkań do rankingu dla wybranej daty.")
                     }
 
+                    if (
+                        combinedDailyMatches.any { it.source == "API-Football" } &&
+                        combinedSeasonMatches.none { it.source == "API-Football" }
+                    ) {
+                        InfoCard(
+                            "Aby TOP analizował mecze globalne, w zakładce GLOBAL wybierz konkretną ligę i pobierz jej sezon."
+                        )
+                    }
+
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
