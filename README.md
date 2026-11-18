@@ -44,7 +44,7 @@ Test historyczny obejmuje tylko mecze z aktualnie załadowanej ligi i sezonu. Sp
 
 Projekt używa Kotlin, Android Gradle Plugin i Jetpack Compose.
 
-GitHub Actions uruchamia testy jednostkowe, a następnie buduje APK debug. Gotowy plik APK znajduje się w artefaktach workflow **Build Android APK**.
+GitHub Actions uruchamia testy jednostkowe, a następnie buduje APK debug. Debug APK używa stałego, jawnie nieprodukcyjnego klucza podpisu, aby kolejne kompilacje można było instalować jako aktualizacje bez konfliktu podpisu. Tego klucza nie wolno używać do publikacji w Google Play. Do wydania produkcyjnego potrzebny jest osobny, prywatny klucz release. Gotowy plik APK znajduje się w artefaktach workflow **Build Android APK**.
 
 Lokalne polecenia:
 
