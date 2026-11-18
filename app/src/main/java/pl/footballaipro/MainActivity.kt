@@ -437,6 +437,11 @@ fun FootballApp(
                         selectedDate = date,
                         onDateChanged = { date = it },
                         onFixturesLoaded = { loaded ->
+                            // Keep the prediction ledger in sync with completed fixtures
+                            // from API-Football, just as the OpenLigaDB flow does.
+                            loaded.forEach { match ->
+                                PredictionPerformance.settleMatch(context, match)
+                            }
                             globalMatches = loaded
                             if (loaded.isNotEmpty() && globalSeasonMatches.isNotEmpty()) {
                                 val refreshedKeys = loaded.map {
@@ -451,7 +456,13 @@ fun FootballApp(
                                 }
                             }
                         },
-                        onSeasonMatchesLoaded = { globalSeasonMatches = it }
+                        onSeasonMatchesLoaded = { loaded ->
+                            // Season refreshes may contain final scores for older matches.
+                            loaded.forEach { match ->
+                                PredictionPerformance.settleMatch(context, match)
+                            }
+                            globalSeasonMatches = loaded
+                        }
                     )
                 }
 
