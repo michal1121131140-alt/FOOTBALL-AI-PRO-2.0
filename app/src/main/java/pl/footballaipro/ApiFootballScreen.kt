@@ -97,6 +97,7 @@ fun ApiFootballScreen(
             value = apiKey,
             onValueChange = { apiKey = it },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !loading,
             singleLine = true,
             label = { Text("Klucz API-Football") },
             visualTransformation = if (showKey) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
