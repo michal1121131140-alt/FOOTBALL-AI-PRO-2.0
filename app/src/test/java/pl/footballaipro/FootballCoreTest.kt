@@ -97,6 +97,24 @@ class FootballCoreTest {
         })
     }
 
+    @Test
+    fun historicalBacktestDoesNotUseFutureMatches() {
+        val matches = listOf(
+            match("Home", "Away", "2:1", "2026-01-10"),
+            match("Home", "X1", "1:0", "2026-01-11"),
+            match("Away", "Y1", "1:0", "2026-01-11"),
+            match("Home", "X2", "1:0", "2026-01-12"),
+            match("Away", "Y2", "1:0", "2026-01-12"),
+            match("Home", "X3", "1:0", "2026-01-13"),
+            match("Away", "Y3", "1:0", "2026-01-13")
+        )
+
+        val summary = PredictionBacktest.run(matches)
+
+        assertEquals(0, summary.testedMatches)
+        assertEquals(matches.size, summary.skippedMatches)
+    }
+
     private fun match(
         home: String,
         away: String,
