@@ -141,15 +141,17 @@ fun ApiFootballScreen(context: Context) {
                                 val result = ApiFootballRepository.fetchCurrentLeagues(context, keyToCheck, year)
                                 ApiFootballSettings.saveApiKey(context, keyToCheck)
                                 Handler(Looper.getMainLooper()).post {
-                                    availableLeagues = result
-                                    leagueCount = result.size
-                                    selectedLeague = null
-                                    selectedSeason = null
-                                    standings = emptyList()
-                                    fixtures = emptyList()
-                                    selected = null
-                                    research = null
-                                    status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
+                                    if (apiKey.trim() == keyToCheck) {
+                                        availableLeagues = result
+                                        leagueCount = result.size
+                                        selectedLeague = null
+                                        selectedSeason = null
+                                        standings = emptyList()
+                                        fixtures = emptyList()
+                                        selected = null
+                                        research = null
+                                        status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
+                                    }
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -299,13 +301,19 @@ fun ApiFootballScreen(context: Context) {
                                 )
                                 val settledCount = settleFinishedApiFixtures(context, result)
                                 Handler(Looper.getMainLooper()).post {
-                                    fixtures = result
-                                    val message = if (result.isEmpty()) {
-                                        "Brak spotkań w bazie dla tej daty."
-                                    } else "Znaleziono spotkań: " + result.size
-                                    status = message + if (settledCount > 0) {
-                                        " • rozliczono typów: " + settledCount
-                                    } else ""
+                                    if (
+                                        date == requestedDate &&
+                                        selectedLeague?.id == leagueFilter?.id &&
+                                        selectedSeason == seasonFilter
+                                    ) {
+                                        fixtures = result
+                                        val message = if (result.isEmpty()) {
+                                            "Brak spotkań w bazie dla tej daty."
+                                        } else "Znaleziono spotkań: " + result.size
+                                        status = message + if (settledCount > 0) {
+                                            " • rozliczono typów: " + settledCount
+                                        } else ""
+                                    }
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -343,10 +351,12 @@ fun ApiFootballScreen(context: Context) {
                                     leagueId = leagueFilter?.id
                                 )
                                 Handler(Looper.getMainLooper()).post {
-                                    fixtures = result
-                                    status = if (result.isEmpty()) {
-                                        "Brak trwających spotkań w dostępnych ligach."
-                                    } else "Spotkania na żywo: " + result.size + " • odświeżanie ręczne"
+                                    if (selectedLeague?.id == leagueFilter?.id) {
+                                        fixtures = result
+                                        status = if (result.isEmpty()) {
+                                            "Brak trwających spotkań w dostępnych ligach."
+                                        } else "Spotkania na żywo: " + result.size + " • odświeżanie ręczne"
+                                    }
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -385,10 +395,15 @@ fun ApiFootballScreen(context: Context) {
                                     seasonForRequest
                                 )
                                 Handler(Looper.getMainLooper()).post {
-                                    standings = result
-                                    status = if (result.isEmpty()) {
-                                        "Brak tabeli dla tej ligi i sezonu w API-Football."
-                                    } else "Tabela załadowana: " + result.size + " drużyn."
+                                    if (
+                                        selectedLeague?.id == leagueFilter.id &&
+                                        selectedSeason == seasonForRequest
+                                    ) {
+                                        standings = result
+                                        status = if (result.isEmpty()) {
+                                            "Brak tabeli dla tej ligi i sezonu w API-Football."
+                                        } else "Tabela załadowana: " + result.size + " drużyn."
+                                    }
                                     loading = false
                                 }
                             } catch (e: Exception) {
