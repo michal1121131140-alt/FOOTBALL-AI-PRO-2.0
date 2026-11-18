@@ -1,0 +1,255 @@
+package pl.footballaipro
+
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+
+data class ApiFootballLeague(
+    val id: Int,
+    val name: String,
+    val country: String,
+    val season: Int
+)
+
+data class ApiFootballFixture(
+    val id: Int,
+    val leagueId: Int,
+    val leagueName: String,
+    val home: String,
+    val away: String,
+    val date: String,
+    val status: String,
+    val score: String
+)
+
+data class ApiFootballPredictionData(
+    val advice: String,
+    val winner: String,
+    val homeWin: String,
+    val draw: String,
+    val awayWin: String,
+    val homeForm: String,
+    val awayForm: String,
+    val comparison: Map<String, Pair<String, String>>
+)
+
+data class ApiFootballInjury(
+    val player: String,
+    val team: String,
+    val reason: String
+)
+
+data class ApiFootballOdds(
+    val bookmaker: String,
+    val market: String,
+    val selection: String,
+    val odd: String
+)
+
+/**
+ * API-Football v3 integration.
+ * All requests are explicit and user-triggered; the caller should cache results
+ * to respect the free plan's daily request quota.
+ */
+object ApiFootballRepository {
+    private const val BASE_URL = "https://v3.football.api-sports.io"
+
+    private fun request(apiKey: String, path: String, query: Map<String, String> = emptyMap()): JSONObject {
+        require(apiKey.isNotBlank()) { "Dodaj klucz API-Football w ustawieniach." }
+        val queryString = query.entries.joinToString("&") { (key, value) ->
+            "${encode(key)}=${encode(value)}"
+        }
+        val fullUrl = BASE_URL + path + if (queryString.isNotEmpty()) "?$queryString" else ""
+        val connection = (URL(fullUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15000
+            readTimeout = 20000
+            setRequestProperty("x-apisports-key", apiKey)
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("User-Agent", "FootballAIPro/2.0")
+        }
+
+        val body = try {
+            val stream = if (connection.responseCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream
+            }
+            stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        } finally {
+            connection.disconnect()
+        }
+
+        val json = try {
+            JSONObject(body)
+        } catch (_: Exception) {
+            throw IllegalStateException("API-Football zwróciło nieprawidłową odpowiedź.")
+        }
+
+        val errors = json.optJSONObject("errors")
+        if (errors != null && errors.length() > 0) {
+            val details = errors.keys().asSequence()
+                .map { key -> "$key: ${errors.opt(key)}" }
+                .joinToString("; ")
+            throw IllegalStateException("Błąd API-Football: $details")
+        }
+        return json
+    }
+
+    fun fetchCurrentLeagues(apiKey: String, season: Int): List<ApiFootballLeague> {
+        val response = request(
+            apiKey,
+            "/leagues",
+            mapOf("season" to season.toString())
+        ).optJSONArray("response") ?: JSONArray()
+
+        val leagues = mutableListOf<ApiFootballLeague>()
+        for (i in 0 until response.length()) {
+            val item = response.optJSONObject(i) ?: continue
+            val league = item.optJSONObject("league") ?: continue
+            val country = item.optJSONObject("country")?.optString("name").orEmpty()
+            val seasons = item.optJSONArray("seasons") ?: JSONArray()
+            val seasonAvailable = (0 until seasons.length()).any { index ->
+                seasons.optJSONObject(index)?.optInt("year") == season
+            }
+            if (!seasonAvailable) continue
+
+            val id = league.optInt("id")
+            val name = league.optString("name")
+            if (id > 0 && name.isNotBlank()) {
+                leagues.add(ApiFootballLeague(id, name, country, season))
+            }
+        }
+        return leagues.sortedWith(compareBy({ it.country }, { it.name }))
+    }
+
+    fun fetchFixtures(
+        apiKey: String,
+        date: String,
+        leagueId: Int? = null,
+        season: Int? = null
+    ): List<ApiFootballFixture> {
+        val query = linkedMapOf("date" to date, "timezone" to "Europe/Warsaw")
+        if (leagueId != null && season != null) {
+            query["league"] = leagueId.toString()
+            query["season"] = season.toString()
+        }
+        val response = request(apiKey, "/fixtures", query)
+            .optJSONArray("response") ?: JSONArray()
+
+        val fixtures = mutableListOf<ApiFootballFixture>()
+        for (i in 0 until response.length()) {
+            val item = response.optJSONObject(i) ?: continue
+            val fixture = item.optJSONObject("fixture") ?: continue
+            val league = item.optJSONObject("league") ?: continue
+            val teams = item.optJSONObject("teams") ?: continue
+            val home = teams.optJSONObject("home")?.optString("name").orEmpty()
+            val away = teams.optJSONObject("away")?.optString("name").orEmpty()
+            if (home.isBlank() || away.isBlank()) continue
+
+            val goals = item.optJSONObject("goals")
+            val homeGoals = goals?.opt("home")
+            val awayGoals = goals?.opt("away")
+            val score = if (homeGoals != null && homeGoals != JSONObject.NULL &&
+                awayGoals != null && awayGoals != JSONObject.NULL
+            ) "$homeGoals : $awayGoals" else "Nie rozegrano"
+
+            fixtures.add(
+                ApiFootballFixture(
+                    id = fixture.optInt("id"),
+                    leagueId = league.optInt("id"),
+                    leagueName = league.optString("name"),
+                    home = home,
+                    away = away,
+                    date = fixture.optString("date").take(10),
+                    status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
+                    score = score
+                )
+            )
+        }
+        return fixtures
+    }
+
+    fun fetchPredictions(apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
+        val response = request(
+            apiKey, "/predictions", mapOf("fixture" to fixtureId.toString())
+        ).optJSONArray("response") ?: return null
+        val item = response.optJSONObject(0) ?: return null
+        val predictions = item.optJSONObject("predictions") ?: JSONObject()
+        val winner = predictions.optJSONObject("winner")?.optString("name").orEmpty()
+        val comparisonObject = item.optJSONObject("comparison") ?: JSONObject()
+        val comparison = linkedMapOf<String, Pair<String, String>>()
+        val keys = listOf("form", "att", "def", "poisson_distribution", "h2h", "goals", "total", "percent")
+        for (key in keys) {
+            val value = comparisonObject.optJSONObject(key) ?: continue
+            comparison[key] = value.optString("home") to value.optString("away")
+        }
+        return ApiFootballPredictionData(
+            advice = predictions.optString("advice"),
+            winner = winner,
+            homeWin = predictions.optJSONObject("percent")?.optString("home").orEmpty(),
+            draw = predictions.optJSONObject("percent")?.optString("draw").orEmpty(),
+            awayWin = predictions.optJSONObject("percent")?.optString("away").orEmpty(),
+            homeForm = comparison["form"]?.first.orEmpty(),
+            awayForm = comparison["form"]?.second.orEmpty(),
+            comparison = comparison
+        )
+    }
+
+    fun fetchInjuries(apiKey: String, fixtureId: Int): List<ApiFootballInjury> {
+        val response = request(
+            apiKey, "/injuries", mapOf("fixture" to fixtureId.toString())
+        ).optJSONArray("response") ?: JSONArray()
+        val result = mutableListOf<ApiFootballInjury>()
+        for (i in 0 until response.length()) {
+            val item = response.optJSONObject(i) ?: continue
+            val player = item.optJSONObject("player") ?: JSONObject()
+            val team = item.optJSONObject("team") ?: JSONObject()
+            result.add(
+                ApiFootballInjury(
+                    player = player.optString("name"),
+                    team = team.optString("name"),
+                    reason = listOf(player.optString("type"), player.optString("reason"))
+                        .filter { it.isNotBlank() }.joinToString(" – ")
+                )
+            )
+        }
+        return result
+    }
+
+    fun fetchOdds(apiKey: String, fixtureId: Int): List<ApiFootballOdds> {
+        val response = request(
+            apiKey, "/odds", mapOf("fixture" to fixtureId.toString())
+        ).optJSONArray("response") ?: JSONArray()
+        val result = mutableListOf<ApiFootballOdds>()
+        for (i in 0 until response.length()) {
+            val item = response.optJSONObject(i) ?: continue
+            val bookmakers = item.optJSONArray("bookmakers") ?: continue
+            for (b in 0 until bookmakers.length()) {
+                val bookmaker = bookmakers.optJSONObject(b) ?: continue
+                val bets = bookmaker.optJSONArray("bets") ?: continue
+                for (j in 0 until bets.length()) {
+                    val bet = bets.optJSONObject(j) ?: continue
+                    val values = bet.optJSONArray("values") ?: continue
+                    for (k in 0 until values.length()) {
+                        val value = values.optJSONObject(k) ?: continue
+                        result.add(
+                            ApiFootballOdds(
+                                bookmaker = bookmaker.optString("name"),
+                                market = bet.optString("name"),
+                                selection = value.optString("value"),
+                                odd = value.optString("odd")
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private fun encode(value: String): String =
+        URLEncoder.encode(value, Charsets.UTF_8.name())
+}
