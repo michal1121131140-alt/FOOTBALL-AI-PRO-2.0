@@ -103,6 +103,21 @@ class FootballCoreLogicTest {
     }
 
     @Test
+    fun apiFootballOnlySettlesFixturesWithFinishedStatuses() {
+        listOf("FT", "AET", "PEN", "AWD", "WO").forEach { status ->
+            assertTrue("$status should be finished", isFinishedFixture(status))
+            assertTrue("$status should be case-insensitive", isFinishedFixture(status.lowercase()))
+        }
+
+        listOf(
+            "NS", "1H", "HT", "2H", "ET", "BT", "P",
+            "LIVE", "SUSP", "INT", "PST", "CANC", "ABD", ""
+        ).forEach { status ->
+            assertFalse("$status must not settle a prediction", isFinishedFixture(status))
+        }
+    }
+
+    @Test
     fun apiErrorsExplainAuthenticationQuotaAndServerFailures() {
         assertTrue(apiHttpErrorMessage(401, null).contains("klucz API-Football", ignoreCase = true))
         assertTrue(apiHttpErrorMessage(429, null).contains("limit zapytań", ignoreCase = true))
