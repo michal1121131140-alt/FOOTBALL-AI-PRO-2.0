@@ -498,13 +498,17 @@ fun ApiFootballScreen(
                                     leagueForRequest.id,
                                     seasonForRequest
                                 )
-                                val dailyResult = ApiFootballRepository.fetchFixtures(
-                                    context,
-                                    keyForRequest,
-                                    requestedDate,
-                                    leagueId = leagueForRequest.id,
-                                    season = seasonForRequest
-                                )
+                                val dailyRequest = runCatching {
+                                    ApiFootballRepository.fetchFixtures(
+                                        context,
+                                        keyForRequest,
+                                        requestedDate,
+                                        leagueId = leagueForRequest.id,
+                                        season = seasonForRequest
+                                    )
+                                }
+                                val dailyResult = dailyRequest.getOrDefault(emptyList())
+                                val dailyError = dailyRequest.exceptionOrNull()?.message
                                 val settledCount = settleFinishedApiFixtures(context, result)
                                 val converted = result.map { fixture ->
                                     FootballMatch(
@@ -535,7 +539,8 @@ fun ApiFootballScreen(
                                                 )
                                             })
                                         }
-                                        status = "Sezon: ${converted.size} spotkań • mecze ${requestedDate}: ${dailyResult.size} • rozliczono typów: ${settledCount}. Dane są dostępne w TOP i teście historycznym."
+                                        status = "Sezon: ${converted.size} spotkań • mecze ${requestedDate}: ${dailyResult.size} • rozliczono typów: ${settledCount}." +
+                                            (dailyError?.let { " Nie udało się pobrać meczów dnia: $it" } ?: " Dane są dostępne w TOP i teście historycznym.")
                                     }
                                     loading = false
                                 }
