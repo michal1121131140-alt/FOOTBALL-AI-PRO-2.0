@@ -5,6 +5,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val stableDebugKeystore = layout.buildDirectory.file("stable-debug.keystore").get().asFile
+val stableDebugKeystoreBase64 = file("debug.keystore.base64")
+if (stableDebugKeystoreBase64.exists()) {
+    stableDebugKeystore.parentFile.mkdirs()
+    stableDebugKeystore.writeBytes(
+        java.util.Base64.getDecoder().decode(stableDebugKeystoreBase64.readText().trim())
+    )
+}
+
 android {
     namespace = "pl.footballaipro"
     compileSdk = 35
@@ -15,6 +24,21 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "2.0.1"
+    }
+
+    signingConfigs {
+        create("stableDebug") {
+            storeFile = stableDebugKeystore
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("stableDebug")
+        }
     }
 
     buildFeatures {
