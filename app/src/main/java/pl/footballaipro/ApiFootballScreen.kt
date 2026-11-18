@@ -83,7 +83,7 @@ fun ApiFootballScreen(context: Context) {
                         thread {
                             try {
                                 val year = SimpleDateFormat("yyyy", Locale.US).format(Date()).toInt()
-                                val count = ApiFootballRepository.fetchCurrentLeagues(apiKey, year).size
+                                val count = ApiFootballRepository.fetchCurrentLeagues(context, apiKey, year).size
                                 ApiFootballSettings.saveApiKey(context, apiKey)
                                 Handler(Looper.getMainLooper()).post {
                                     leagueCount = count
@@ -125,7 +125,7 @@ fun ApiFootballScreen(context: Context) {
                     status = "Pobieram spotkania ze wszystkich dostępnych lig..."
                     thread {
                         try {
-                            val result = ApiFootballRepository.fetchFixtures(apiKey, date)
+                            val result = ApiFootballRepository.fetchFixtures(context, apiKey, date)
                             Handler(Looper.getMainLooper()).post {
                                 fixtures = result
                                 status = if (result.isEmpty()) "Brak spotkań w bazie dla tej daty." else "Znaleziono spotkań: " + result.size
@@ -165,9 +165,9 @@ fun ApiFootballScreen(context: Context) {
                             thread {
                                 try {
                                     val result = FixtureResearch(
-                                        ApiFootballRepository.fetchPredictions(apiKey, fixture.id),
-                                        ApiFootballRepository.fetchInjuries(apiKey, fixture.id),
-                                        ApiFootballRepository.fetchOdds(apiKey, fixture.id)
+                                        ApiFootballRepository.fetchPredictions(context, apiKey, fixture.id),
+                                        ApiFootballRepository.fetchInjuries(context, apiKey, fixture.id),
+                                        ApiFootballRepository.fetchOdds(context, apiKey, fixture.id)
                                     )
                                     Handler(Looper.getMainLooper()).post {
                                         research = result
