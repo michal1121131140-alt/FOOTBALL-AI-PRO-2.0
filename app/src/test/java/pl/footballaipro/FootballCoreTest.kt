@@ -116,6 +116,27 @@ class FootballCoreTest {
     }
 
     @Test
+    fun historicalBacktestTestsMatchesAfterMinimumPriorSamples() {
+        val matches = listOf(
+            match("Home", "H1", "2:0", "2026-01-01"),
+            match("Home", "H2", "2:0", "2026-01-02"),
+            match("H3", "Home", "0:2", "2026-01-03"),
+            match("Away", "A1", "0:1", "2026-01-01"),
+            match("Away", "A2", "0:1", "2026-01-02"),
+            match("A3", "Away", "1:0", "2026-01-03"),
+            match("HOME", "AWAY", "1:0", "2026-01-10"),
+            match("Other", "Team", "Nie rozegrano", "2026-01-11")
+        )
+
+        val summary = PredictionBacktest.run(matches)
+
+        assertEquals(1, summary.testedMatches)
+        assertEquals(7, summary.skippedMatches)
+        assertTrue(summary.accuracy in 0.0..100.0)
+        assertTrue(summary.averageBrierScore in 0.0..2.0)
+    }
+
+    @Test
     fun dateValidatorRejectsImpossibleAndMalformedDates() {
         assertTrue(FootballDateValidator.isValid("2026-11-18"))
         assertFalse(FootballDateValidator.isValid("2026-02-30"))
