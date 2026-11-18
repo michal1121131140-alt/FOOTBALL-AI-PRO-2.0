@@ -12,23 +12,17 @@ object PredictionBacktest {
 
     // For each historical match, only earlier completed matches are used.
     fun run(matches: List<FootballMatch>): BacktestSummary {
-        val ordered = matches.sortedBy { it.date }
+        val completed = matches
+            .filter { FootballScoreParser.parse(it.score) != null }
+            .sortedBy { it.date }
         var tested = 0
-        var skipped = 0
+        var skipped = matches.size - completed.size
         var correct = 0
         var brierTotal = 0.0
 
-        ordered.forEach { target ->
-            val actual = FootballScoreParser.parse(target.score)
-            if (actual == null) {
-                skipped++
-                return@forEach
-            }
-
-            val previous = ordered.filter {
-                it.date < target.date &&
-                    FootballScoreParser.parse(it.score) != null
-            }
+        completed.forEach { target ->
+            val actual = FootballScoreParser.parse(target.score) ?: return@forEach
+            val previous = completed.filter { it.date < target.date }
             val homeStats = teamStats(target.home, previous)
             val awayStats = teamStats(target.away, previous)
 
@@ -97,8 +91,8 @@ object PredictionBacktest {
 
         matches.forEach { match ->
             val score = FootballScoreParser.parse(match.score) ?: return@forEach
-            val isHome = match.home == team
-            val isAway = match.away == team
+            val isHome = match.home.equals(team, ignoreCase = true)
+            val isAway = match.away.equals(team, ignoreCase = true)
             if (!isHome && !isAway) return@forEach
 
             val goalsFor = if (isHome) score.home else score.away
