@@ -146,6 +146,7 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
             ) { Text("SPRAWDŹ", fontSize = 10.sp) }
@@ -253,6 +254,7 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
                 colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
             ) { Text("MECZE Z DATY", fontSize = 11.sp) }
 
@@ -293,6 +295,7 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
                 colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
             ) { Text("NA ŻYWO", fontSize = 11.sp) }
         }
@@ -380,6 +383,7 @@ fun ApiFootballScreen(context: Context) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !loading,
                         colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
                     ) { Text("URUCHOM ANALIZĘ 1X2") }
                 } else {
