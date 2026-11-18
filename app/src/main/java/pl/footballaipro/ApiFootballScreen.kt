@@ -85,15 +85,34 @@ fun ApiFootballScreen(context: Context) {
             trailingIcon = { TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "UKRYJ" else "POKAŻ") } }
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(
                 onClick = {
                     ApiFootballSettings.saveApiKey(context, apiKey)
-                    status = "Klucz zapisany na tym urządzeniu."
+                    status = "Klucz zapisany i zaszyfrowany na tym urządzeniu."
                 },
                 modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
-            ) { Text("ZAPISZ KLUCZ") }
+            ) { Text("ZAPISZ", fontSize = 10.sp) }
+
+            Button(
+                onClick = {
+                    ApiFootballSettings.saveApiKey(context, "")
+                    ApiFootballRepository.clearCache(context)
+                    apiKey = ""
+                    availableLeagues = emptyList()
+                    selectedLeague = null
+                    leagueCount = null
+                    fixtures = emptyList()
+                    selected = null
+                    research = null
+                    status = "Klucz API i lokalny cache zostały usunięte."
+                },
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+            ) { Text("USUŃ KLUCZ", fontSize = 10.sp) }
 
             Button(
                 onClick = {
@@ -125,8 +144,9 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
-            ) { Text("SPRAWDŹ API") }
+            ) { Text("SPRAWDŹ", fontSize = 10.sp) }
         }
 
         OutlinedTextField(
