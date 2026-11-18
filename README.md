@@ -11,7 +11,7 @@ Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny pr
 - **Prognozy:** model Poissona dla 1X2, sumy goli i BTTS, a także pięć najbardziej prawdopodobnych dokładnych wyników.
 - **TOP 10:** ranking spotkań na podstawie prognozy i wiarygodności danych.
 - **Value Betting:** porównanie prawdopodobieństwa modelu z kursem dziesiętnym.
-- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników, skuteczność, ROI i bilans.
+- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników, skuteczność, ROI, bilans i eksport historii do CSV.
 - **Test historyczny:** sprawdzanie prognoz na podstawie wcześniejszych wyników, bez wykorzystywania wyniku analizowanego meczu.
 
 ## Źródła danych i konfiguracja
@@ -29,7 +29,7 @@ Zakładka GLOBAL korzysta z API-Football (API-Sports). Wymaga własnego klucza A
 3. Wklej klucz i wybierz ZAPISZ KLUCZ.
 4. Wybierz SPRAWDŹ API, a następnie pobierz mecze dla wybranej daty.
 
-Klucz jest przechowywany lokalnie w prywatnych preferencjach aplikacji i nie powinien być dodawany do repozytorium. Liczba dostępnych lig, kursów, prognoz i absencji zależy od planu API-Football oraz limitów zapytań. Aplikacja buforuje odpowiedzi, aby ograniczać liczbę wywołań.
+Klucz jest szyfrowany lokalnie algorytmem AES-256-GCM, a klucz szyfrujący jest przechowywany w Android Keystore. Klucz API nie jest dodawany do repozytorium. Starszy zapis tekstowy jest migrowany do formatu szyfrowanego przy pierwszym odczycie. Liczba dostępnych lig, kursów, prognoz i absencji zależy od planu API-Football oraz limitów zapytań. Aplikacja buforuje odpowiedzi, aby ograniczać liczbę wywołań.
 
 ## Jak działa model
 
