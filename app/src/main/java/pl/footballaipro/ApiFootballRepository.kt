@@ -6,6 +6,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 
 data class ApiFootballLeague(
     val id: Int,
@@ -65,7 +66,14 @@ object ApiFootballRepository {
         }
         val fullUrl = BASE_URL + path + if (queryString.isNotEmpty()) "?$queryString" else ""
         val cache = context.getSharedPreferences("api_football_response_cache", Context.MODE_PRIVATE)
-        val cacheKey = "response_" + (path + "?" + queryString).hashCode()
+        // Keep cached responses separate when the user changes API credentials.
+        // Only a short SHA-256 fingerprint is stored; the API key itself is not.
+        val credentialFingerprint = MessageDigest.getInstance("SHA-256")
+            .digest(apiKey.toByteArray(Charsets.UTF_8))
+            .take(8)
+            .joinToString("") { byte -> "%02x".format(byte) }
+        val cacheKey = "response_" + credentialFingerprint + "_" +
+            (path + "?" + queryString).hashCode()
         val cachedAt = cache.getLong(cacheKey + "_time", 0L)
         val cacheTtl = when (path) {
             "/leagues" -> 24L * 60L * 60L * 1000L
