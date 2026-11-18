@@ -33,7 +33,8 @@ private val ApiGreen = Color(0xFF27C987)
 private data class FixtureResearch(
     val prediction: ApiFootballPredictionData?,
     val injuries: List<ApiFootballInjury>,
-    val odds: List<ApiFootballOdds>
+    val odds: List<ApiFootballOdds>,
+    val errors: List<String>
 )
 
 @Composable
@@ -188,14 +189,35 @@ fun ApiFootballScreen(context: Context) {
                             status = "Pobieram prognozę, absencje i kursy..."
                             thread {
                                 try {
-                                    val result = FixtureResearch(
-                                        ApiFootballRepository.fetchPredictions(context, apiKey, fixture.id),
-                                        ApiFootballRepository.fetchInjuries(context, apiKey, fixture.id),
+                                    val predictionResult = runCatching {
+                                        ApiFootballRepository.fetchPredictions(context, apiKey, fixture.id)
+                                    }
+                                    val injuriesResult = runCatching {
+                                        ApiFootballRepository.fetchInjuries(context, apiKey, fixture.id)
+                                    }
+                                    val oddsResult = runCatching {
                                         ApiFootballRepository.fetchOdds(context, apiKey, fixture.id)
+                                    }
+                                    val errors = buildList {
+                                        predictionResult.exceptionOrNull()?.let { add("Prognoza: ${it.message ?: "błąd API"}") }
+                                        injuriesResult.exceptionOrNull()?.let { add("Absencje: ${it.message ?: "błąd API"}") }
+                                        oddsResult.exceptionOrNull()?.let { add("Kursy: ${it.message ?: "błąd API"}") }
+                                    }
+                                    val result = FixtureResearch(
+                                        prediction = predictionResult.getOrNull(),
+                                        injuries = injuriesResult.getOrDefault(emptyList()),
+                                        odds = oddsResult.getOrDefault(emptyList()),
+                                        errors = errors
                                     )
                                     Handler(Looper.getMainLooper()).post {
-                                        research = result
-                                        status = "Analiza pobrana."
+                                        if (selected?.id == fixture.id) {
+                                            research = result
+                                            status = if (errors.isEmpty()) {
+                                                "Analiza pobrana."
+                                            } else {
+                                                "Pobrano częściowe dane. Niedostępne źródła: ${errors.size}."
+                                            }
+                                        }
                                         loading = false
                                     }
                                 } catch (e: Exception) {
@@ -211,6 +233,17 @@ fun ApiFootballScreen(context: Context) {
                     ) { Text("URUCHOM ANALIZĘ 1X2") }
                 } else {
                     val data = research!!
+                    if (data.errors.isNotEmpty()) {
+                        Text(
+                            "Nie wszystkie źródła zwróciły dane:",
+                            color = ApiMuted,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        data.errors.forEach { error ->
+                            Text("• " + error, color = ApiMuted, fontSize = 10.sp)
+                        }
+                    }
                     Text("PROGNOZA 1X2", color = ApiBlue, fontWeight = FontWeight.Bold)
                     val prediction = data.prediction
                     if (prediction == null) {
