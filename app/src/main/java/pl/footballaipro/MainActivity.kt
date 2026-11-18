@@ -434,6 +434,8 @@ fun FootballApp(
                 "GLOBAL" -> {
                     ApiFootballScreen(
                         context = context,
+                        selectedDate = date,
+                        onDateChanged = { date = it },
                         onFixturesLoaded = { globalMatches = it },
                         onSeasonMatchesLoaded = { globalSeasonMatches = it }
                     )
