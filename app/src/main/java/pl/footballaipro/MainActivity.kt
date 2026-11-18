@@ -328,7 +328,22 @@ fun FootballApp(
         )
     }
 
-    MaterialTheme {
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = Blue,
+            onPrimary = White,
+            secondary = Green,
+            onSecondary = Navy,
+            background = Navy,
+            onBackground = White,
+            surface = Panel,
+            onSurface = White,
+            surfaceVariant = Panel,
+            onSurfaceVariant = Muted,
+            error = Red,
+            onError = White
+        )
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
