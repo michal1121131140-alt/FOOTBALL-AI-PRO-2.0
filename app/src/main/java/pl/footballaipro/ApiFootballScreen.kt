@@ -184,7 +184,6 @@ fun ApiFootballScreen(context: Context) {
                     }
                 }
             }
-            }
         }
 
         Button(
