@@ -47,6 +47,15 @@ fun ApiFootballScreen(context: Context) {
     var loading by remember { mutableStateOf(false) }
     var showKey by remember { mutableStateOf(false) }
     var leagueCount by remember { mutableStateOf<Int?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredFixtures = remember(fixtures, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) fixtures else fixtures.filter { fixture ->
+            fixture.home.contains(query, ignoreCase = true) ||
+                fixture.away.contains(query, ignoreCase = true) ||
+                fixture.leagueName.contains(query, ignoreCase = true)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("GLOBALNE MECZE I ANALIZA", color = ApiWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -148,6 +157,21 @@ fun ApiFootballScreen(context: Context) {
         if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ApiBlue)
         leagueCount?.let { Text("Ligi wykryte podczas testu: " + it, color = ApiGreen, fontSize = 11.sp) }
 
+        if (fixtures.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Szukaj ligi lub drużyny") }
+            )
+            Text(
+                "Widoczne mecze: ${filteredFixtures.size} / ${fixtures.size}",
+                color = ApiMuted,
+                fontSize = 10.sp
+            )
+        }
+
         selected?.let { fixture ->
             Column(
                 modifier = Modifier.fillMaxWidth().background(ApiPanel, RoundedCornerShape(12.dp)).padding(12.dp),
@@ -155,7 +179,7 @@ fun ApiFootballScreen(context: Context) {
             ) {
                 Text("ANALIZA MECZU", color = ApiBlue, fontWeight = FontWeight.Bold)
                 Text(fixture.home + " — " + fixture.away, color = ApiWhite, fontWeight = FontWeight.Bold)
-                Text(fixture.leagueName + " • " + fixture.date, color = ApiMuted, fontSize = 11.sp)
+                Text(fixture.leagueName + " • " + fixture.date + " " + fixture.time, color = ApiMuted, fontSize = 11.sp)
 
                 if (research == null) {
                     Button(
@@ -261,14 +285,14 @@ fun ApiFootballScreen(context: Context) {
 
         Text("MECZE (" + fixtures.size + ")", color = ApiWhite, fontWeight = FontWeight.Bold)
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            items(fixtures) { fixture ->
+            items(filteredFixtures) { fixture ->
                 Column(
                     modifier = Modifier.fillMaxWidth().background(ApiPanel, RoundedCornerShape(10.dp))
                         .clickable { selected = fixture; research = null }
                         .padding(11.dp)
                 ) {
                     Text(fixture.home + " — " + fixture.away, color = ApiWhite, fontWeight = FontWeight.Bold)
-                    Text(fixture.leagueName + " • " + fixture.date, color = ApiMuted, fontSize = 11.sp)
+                    Text(fixture.leagueName + " • " + fixture.date + " " + fixture.time, color = ApiMuted, fontSize = 11.sp)
                     Text(if (fixture.score == "Nie rozegrano") fixture.status else fixture.score, color = ApiBlue, fontSize = 11.sp)
                 }
             }
