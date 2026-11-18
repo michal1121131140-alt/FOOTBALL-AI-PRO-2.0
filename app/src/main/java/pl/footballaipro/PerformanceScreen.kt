@@ -1,4 +1,3 @@
-
 package pl.footballaipro
 
 import androidx.compose.foundation.layout.Arrangement
@@ -26,106 +25,91 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 
 @Composable
-fun PerformanceScreen() {
+fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
     val context = LocalContext.current
-
     val records = remember {
         mutableStateOf(PredictionPerformance.getAll(context))
     }
-
     val stats = remember(records.value) {
         PredictionPerformance.getStats(context)
     }
+    val backtest = remember(seasonMatches) {
+        PredictionBacktest.run(seasonMatches)
+    }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
         Text(
             text = "SKUTECZNOŚĆ PRO",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
-
         Spacer(modifier = Modifier.height(12.dp))
-
         Button(
-            onClick = {
-                records.value = PredictionPerformance.getAll(context)
-            },
+            onClick = { records.value = PredictionPerformance.getAll(context) },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("ODŚWIEŻ STATYSTYKI")
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCard(
-                title = "Wszystkie typy",
-                value = stats.total.toString(),
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                title = "Oczekujące",
-                value = stats.open.toString(),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCard(
-                title = "Wygrane",
-                value = stats.wins.toString(),
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                title = "Przegrane",
-                value = stats.losses.toString(),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCard(
-                title = "Skuteczność",
-                value = format(stats.winRate) + "%",
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                title = "ROI",
-                value = format(stats.roi) + "%",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                containerColor = MaterialTheme.colorScheme.primaryContainer
             )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text("TEST HISTORYCZNY MODELU", fontWeight = FontWeight.Bold)
+                Text("Sprawdzone mecze: ${backtest.testedMatches}")
+                Text("Pominięte mecze: ${backtest.skippedMatches}")
                 Text(
-                    text = "Bilans finansowy",
+                    "Trafione wskazania 1X2: ${backtest.correctPredictions} / ${backtest.testedMatches}"
+                )
+                Text(
+                    "Skuteczność 1X2: ${format(backtest.accuracy)}%",
                     fontWeight = FontWeight.Bold
                 )
+                Text("Średni Brier Score: ${format(backtest.averageBrierScore)}")
+                Text(
+                    "Test wykorzystuje wyłącznie wcześniejsze wyniki z aktualnie załadowanej ligi i sezonu.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard("Wszystkie typy", stats.total.toString(), Modifier.weight(1f))
+            StatCard("Oczekujące", stats.open.toString(), Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard("Wygrane", stats.wins.toString(), Modifier.weight(1f))
+            StatCard("Przegrane", stats.losses.toString(), Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatCard("Skuteczność", format(stats.winRate) + "%", Modifier.weight(1f))
+            StatCard("ROI", format(stats.roi) + "%", Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Bilans finansowy", fontWeight = FontWeight.Bold)
                 Text("Stawki rozliczone: ${format(stats.totalStake)}")
                 Text(
                     text = "Zysk / strata: ${format(stats.totalProfit)}",
@@ -134,23 +118,15 @@ fun PerformanceScreen() {
                 Text("Rozliczone typy: ${stats.settled}")
             }
         }
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "HISTORIA TYPÓW",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
+        Text("HISTORIA TYPÓW", style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
 
         if (records.value.isEmpty()) {
             Text("Nie zapisano jeszcze żadnych typów.")
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(
                     items = records.value.sortedByDescending { it.createdAt },
                     key = { it.id }
@@ -170,15 +146,9 @@ private fun StatCard(
 ) {
     Card(modifier = modifier) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text(title, style = MaterialTheme.typography.bodySmall)
+            Text(value, style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -187,25 +157,19 @@ private fun StatCard(
 private fun PredictionRecordCard(record: PredictionRecord) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = "${record.home} - ${record.away}",
-                fontWeight = FontWeight.Bold
-            )
+            Text("${record.home} - ${record.away}", fontWeight = FontWeight.Bold)
             Text("Liga: ${record.league}")
             Text("Rynek: ${record.market}")
             Text("Typ: ${record.selection}")
             Text("Kurs: ${format(record.odds)}")
             Text("Stawka: ${format(record.stake)}")
             Text("Prawdopodobieństwo modelu: ${format(record.probability)}%")
-
             Spacer(modifier = Modifier.height(4.dp))
-
             val status = when {
                 !record.settled -> "OCZEKUJE NA WYNIK"
                 record.won == true -> "WYGRANY"
                 else -> "PRZEGRANY"
             }
-
             Text(
                 text = status,
                 fontWeight = FontWeight.Bold,
@@ -215,7 +179,6 @@ private fun PredictionRecordCard(record: PredictionRecord) {
                     else -> MaterialTheme.colorScheme.error
                 }
             )
-
             if (record.settled) {
                 Text("Wynik: ${record.actualScore}")
                 Text("Bilans: ${format(record.profit)}")
