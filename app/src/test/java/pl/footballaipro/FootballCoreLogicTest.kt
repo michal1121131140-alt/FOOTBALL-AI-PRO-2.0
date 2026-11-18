@@ -102,6 +102,13 @@ class FootballCoreLogicTest {
         ValueBetting.calculate(50.0, 1.0)
     }
 
+    @Test
+    fun apiErrorsExplainAuthenticationQuotaAndServerFailures() {
+        assertTrue(apiHttpErrorMessage(401, null).contains("klucz API-Football", ignoreCase = true))
+        assertTrue(apiHttpErrorMessage(429, null).contains("limit zapytań", ignoreCase = true))
+        assertTrue(apiHttpErrorMessage(503, null).contains("chwilowy problem", ignoreCase = true))
+    }
+
     private fun match(
         home: String,
         away: String,

@@ -6,6 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.security.MessageDigest
 
 data class ApiFootballLeague(
@@ -93,6 +95,28 @@ internal fun apiHttpErrorMessage(statusCode: Int, payload: JSONObject?): String 
  */
 object ApiFootballRepository {
     private const val BASE_URL = "https://v3.football.api-sports.io"
+
+    private fun requireValidSeason(season: Int) {
+        require(season in 1900..2100) { "Nieprawidłowy sezon: $season." }
+    }
+
+    private fun requireValidFixtureId(fixtureId: Int) {
+        require(fixtureId > 0) { "Nieprawidłowy identyfikator meczu." }
+    }
+
+    private fun requireValidLeagueId(leagueId: Int) {
+        require(leagueId > 0) { "Nieprawidłowy identyfikator ligi." }
+    }
+
+    private fun requireValidDate(date: String) {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            isLenient = false
+        }
+        val parsed = runCatching { formatter.parse(date) }.getOrNull()
+        require(parsed != null && formatter.format(parsed) == date) {
+            "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
+        }
+    }
 
     fun clearCache(context: Context) {
         context.getSharedPreferences(
@@ -197,6 +221,7 @@ object ApiFootballRepository {
     }
 
     fun fetchCurrentLeagues(context: Context, apiKey: String, season: Int): List<ApiFootballLeague> {
+        requireValidSeason(season)
         val leagues = mutableListOf<ApiFootballLeague>()
         var page = 1
         var totalPages = 1
@@ -240,6 +265,12 @@ object ApiFootballRepository {
         leagueId: Int? = null,
         season: Int? = null
     ): List<ApiFootballFixture> {
+        requireValidDate(date)
+        if (leagueId != null) requireValidLeagueId(leagueId)
+        if (season != null) requireValidSeason(season)
+        require((leagueId == null) == (season == null)) {
+            "Identyfikator ligi i sezon muszą być podane razem."
+        }
         val baseQuery = linkedMapOf("date" to date, "timezone" to "Europe/Warsaw")
         if (leagueId != null && season != null) {
             baseQuery["league"] = leagueId.toString()
@@ -266,6 +297,8 @@ object ApiFootballRepository {
         leagueId: Int,
         season: Int
     ): List<ApiFootballFixture> {
+        requireValidLeagueId(leagueId)
+        requireValidSeason(season)
         val baseQuery = linkedMapOf(
             "league" to leagueId.toString(),
             "season" to season.toString(),
@@ -295,6 +328,7 @@ object ApiFootballRepository {
         apiKey: String,
         leagueId: Int? = null
     ): List<ApiFootballFixture> {
+        if (leagueId != null) requireValidLeagueId(leagueId)
         val baseQuery = linkedMapOf(
             "live" to "all",
             "timezone" to "Europe/Warsaw"
@@ -329,7 +363,9 @@ object ApiFootballRepository {
             val teams = item.optJSONObject("teams") ?: continue
             val home = teams.optJSONObject("home")?.optString("name").orEmpty()
             val away = teams.optJSONObject("away")?.optString("name").orEmpty()
-            if (home.isBlank() || away.isBlank()) continue
+            val fixtureId = fixture.optInt("id")
+            val leagueId = league.optInt("id")
+            if (fixtureId <= 0 || leagueId <= 0 || home.isBlank() || away.isBlank()) continue
 
             val goals = item.optJSONObject("goals")
             val homeGoals = goals?.opt("home")
@@ -341,8 +377,8 @@ object ApiFootballRepository {
 
             fixtures.add(
                 ApiFootballFixture(
-                    id = fixture.optInt("id"),
-                    leagueId = league.optInt("id"),
+                    id = fixtureId,
+                    leagueId = leagueId,
                     leagueName = league.optString("name"),
                     home = home,
                     away = away,
@@ -362,6 +398,8 @@ object ApiFootballRepository {
         leagueId: Int,
         season: Int
     ): List<ApiFootballStanding> {
+        requireValidLeagueId(leagueId)
+        requireValidSeason(season)
         val response = request(
             context,
             apiKey,
@@ -403,6 +441,7 @@ object ApiFootballRepository {
     }
 
     fun fetchPredictions(context: Context, apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
+        requireValidFixtureId(fixtureId)
         val response = request(
             context, apiKey, "/predictions", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: return null
@@ -429,6 +468,7 @@ object ApiFootballRepository {
     }
 
     fun fetchInjuries(context: Context, apiKey: String, fixtureId: Int): List<ApiFootballInjury> {
+        requireValidFixtureId(fixtureId)
         val response = request(
             context, apiKey, "/injuries", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: JSONArray()
@@ -450,6 +490,7 @@ object ApiFootballRepository {
     }
 
     fun fetchOdds(context: Context, apiKey: String, fixtureId: Int): List<ApiFootballOdds> {
+        requireValidFixtureId(fixtureId)
         val response = request(
             context, apiKey, "/odds", mapOf("fixture" to fixtureId.toString())
         ).optJSONArray("response") ?: JSONArray()
