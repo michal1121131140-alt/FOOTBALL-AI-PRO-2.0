@@ -20,7 +20,8 @@ object TeamFormAnalyzer {
     ): TeamForm {
         val completed = matches
             .filter {
-                (it.home == teamName || it.away == teamName) &&
+                (it.home.equals(teamName, ignoreCase = true) ||
+                    it.away.equals(teamName, ignoreCase = true)) &&
                     FootballScoreParser.parse(it.score) != null
             }
             .sortedByDescending { it.date }
@@ -33,7 +34,7 @@ object TeamFormAnalyzer {
         val results = completed.mapNotNull { match ->
             val score = FootballScoreParser.parse(match.score)
                 ?: return@mapNotNull null
-            val isHome = match.home == teamName
+            val isHome = match.home.equals(teamName, ignoreCase = true)
 
             when {
                 score.home == score.away -> {
