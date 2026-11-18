@@ -368,7 +368,7 @@ fun FootballApp(
             )
 
             Text(
-                "2.0.2 • INTELIGENTNA ANALIZA PIŁKARSKA",
+                "2.0.3 • INTELIGENTNA ANALIZA PIŁKARSKA",
                 color = Blue,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
