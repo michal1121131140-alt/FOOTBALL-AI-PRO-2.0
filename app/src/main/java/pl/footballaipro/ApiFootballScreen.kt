@@ -497,6 +497,7 @@ fun ApiFootballScreen(
                                     leagueForRequest.id,
                                     seasonForRequest
                                 )
+                                val settledCount = settleFinishedApiFixtures(context, result)
                                 val converted = result.map { fixture ->
                                     FootballMatch(
                                         league = fixture.leagueName,
@@ -513,7 +514,7 @@ fun ApiFootballScreen(
                                         selectedSeason == seasonForRequest
                                     ) {
                                         onSeasonMatchesLoaded(converted)
-                                        status = "Dane sezonu załadowane: ${converted.size} spotkań. TOP i test historyczny mogą z nich korzystać."
+                                        status = "Dane sezonu załadowane: ${converted.size} spotkań. Rozliczono typów: ${settledCount}. TOP i test historyczny mogą z nich korzystać."
                                     }
                                     loading = false
                                 }
