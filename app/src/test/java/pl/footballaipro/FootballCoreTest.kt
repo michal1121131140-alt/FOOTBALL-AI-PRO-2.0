@@ -165,6 +165,16 @@ class FootballCoreTest {
         assertEquals("Brak statusu", fixtureStatusLabel(""))
     }
 
+    @Test
+    fun onlyFinalGlobalFixtureStatusesCanSettlePredictions() {
+        assertTrue(isFinishedFixture("FT"))
+        assertTrue(isFinishedFixture("AET"))
+        assertTrue(isFinishedFixture("PEN"))
+        assertFalse(isFinishedFixture("1H"))
+        assertFalse(isFinishedFixture("HT"))
+        assertFalse(isFinishedFixture("NS"))
+    }
+
     private fun match(
         home: String,
         away: String,
