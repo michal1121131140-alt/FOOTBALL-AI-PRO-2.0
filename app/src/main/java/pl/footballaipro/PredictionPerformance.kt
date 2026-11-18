@@ -211,6 +211,45 @@ object PredictionPerformance {
         )
     }
 
+    /**
+     * Exports the complete prediction ledger as semicolon-separated CSV,
+     * using a header row and escaped values for spreadsheet compatibility.
+     */
+    fun exportCsv(context: Context): String {
+        fun cell(value: String): String =
+            "\"" + value.replace("\"", "\"\"") + "\""
+
+        val header = listOf(
+            "ID", "Liga", "Gospodarze", "Goście", "Rynek", "Typ",
+            "Kurs", "Prawdopodobieństwo (%)", "Stawka", "Data zapisu",
+            "Data meczu", "Rozliczony", "Wygrany", "Wynik", "Zysk/strata"
+        ).joinToString(";")
+
+        val rows = getAll(context)
+            .sortedByDescending { it.createdAt }
+            .map { record ->
+                listOf(
+                    record.id,
+                    record.league,
+                    record.home,
+                    record.away,
+                    record.market,
+                    record.selection,
+                    String.format(java.util.Locale.US, "%.4f", record.odds),
+                    String.format(java.util.Locale.US, "%.2f", record.probability),
+                    String.format(java.util.Locale.US, "%.2f", record.stake),
+                    record.createdAt.toString(),
+                    record.matchDate,
+                    if (record.settled) "TAK" else "NIE",
+                    when (record.won) { true -> "TAK"; false -> "NIE"; null -> "" },
+                    record.actualScore,
+                    String.format(java.util.Locale.US, "%.2f", record.profit)
+                ).joinToString(";") { cell(it) }
+            }
+
+        return "\uFEFF" + (listOf(header) + rows).joinToString("\n")
+    }
+
     fun clear(context: Context) {
         preferences(context).edit().remove(KEY).apply()
     }
