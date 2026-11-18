@@ -325,7 +325,7 @@ fun ApiFootballScreen(context: Context) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 320.dp)
+                    .heightIn(max = 240.dp)
                     .background(ApiPanel, RoundedCornerShape(12.dp))
                     .verticalScroll(rememberScrollState())
                     .padding(12.dp),
