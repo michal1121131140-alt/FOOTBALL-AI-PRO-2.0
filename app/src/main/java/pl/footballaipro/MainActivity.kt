@@ -348,6 +348,7 @@ fun FootballApp(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Navy)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(14.dp)
         ) {
             Text(
