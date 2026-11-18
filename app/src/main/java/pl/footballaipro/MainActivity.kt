@@ -1085,7 +1085,7 @@ fun FootballApp(
                 }
 
                 "STATYSTYKI" -> {
-                    PerformanceScreen()
+                    PerformanceScreen(seasonMatches)
                 }
             }
         }
