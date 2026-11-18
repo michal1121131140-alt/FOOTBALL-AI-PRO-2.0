@@ -111,7 +111,7 @@ fun ApiFootballScreen(
                             leagueCount = result.size
                             selectedLeague = restoredLeague
                             selectedSeason = restoredSeason
-                            if (restoredLeague != null) {
+                            if (restoredLeague != null && date == selectedDate) {
                                 fixtures = restoredFixtures
                                 onFixturesLoaded(restoredFixtures.map { fixture ->
                                     FootballMatch(
