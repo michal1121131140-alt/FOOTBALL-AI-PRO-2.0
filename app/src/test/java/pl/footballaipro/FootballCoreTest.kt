@@ -175,6 +175,15 @@ class FootballCoreTest {
         assertFalse(isFinishedFixture("NS"))
     }
 
+    @Test
+    fun savedPredictionRecordsReceiveUniqueIds() {
+        val match = match("Home", "Away", "Nie rozegrano", "2026-11-18")
+        val first = PredictionPerformance.createRecord(match, "1", 2.0, 60.0)
+        val second = PredictionPerformance.createRecord(match, "1", 2.0, 60.0)
+
+        assertFalse(first.id == second.id)
+    }
+
     private fun match(
         home: String,
         away: String,
