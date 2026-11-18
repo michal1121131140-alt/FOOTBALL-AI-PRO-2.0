@@ -51,7 +51,15 @@ fun ApiFootballScreen(context: Context) {
     var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
     var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
     var leagueMenuExpanded by remember { mutableStateOf(false) }
+    var leagueQuery by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    val filteredLeagues = remember(availableLeagues, leagueQuery) {
+        val query = leagueQuery.trim()
+        if (query.isBlank()) availableLeagues else availableLeagues.filter { league ->
+            league.name.contains(query, ignoreCase = true) ||
+                league.country.contains(query, ignoreCase = true)
+        }
+    }
     val filteredFixtures = remember(fixtures, searchQuery) {
         val query = searchQuery.trim()
         if (query.isBlank()) fixtures else fixtures.filter { fixture ->
@@ -129,6 +137,13 @@ fun ApiFootballScreen(context: Context) {
 
         if (availableLeagues.isNotEmpty()) {
             Text("FILTR ROZGRYWEK", color = ApiMuted, fontSize = 10.sp)
+            OutlinedTextField(
+                value = leagueQuery,
+                onValueChange = { leagueQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Szukaj ligi lub kraju") }
+            )
             Box {
                 Button(
                     onClick = { leagueMenuExpanded = true },
@@ -152,7 +167,7 @@ fun ApiFootballScreen(context: Context) {
                             leagueMenuExpanded = false
                         }
                     )
-                    availableLeagues.forEach { league ->
+                    filteredLeagues.forEach { league ->
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -168,6 +183,7 @@ fun ApiFootballScreen(context: Context) {
                         )
                     }
                 }
+            }
             }
         }
 
