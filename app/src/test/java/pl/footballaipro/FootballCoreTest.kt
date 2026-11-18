@@ -206,6 +206,39 @@ class FootballCoreTest {
     }
 
     @Test
+    fun dailyRankerUsesLeagueSpecificPredictionForSameTeams() {
+        val leagueOnePrediction = MatchPrediction(
+            homeWin = 70.0, draw = 20.0, awayWin = 10.0,
+            over15 = 80.0, over25 = 60.0, over35 = 40.0,
+            under25 = 40.0, bttsYes = 50.0, bttsNo = 50.0,
+            expectedHomeGoals = 1.8, expectedAwayGoals = 0.7,
+            dataReliability = 75.0
+        )
+        val leagueTwoPrediction = leagueOnePrediction.copy(
+            homeWin = 15.0, draw = 25.0, awayWin = 60.0
+        )
+        val fixtures = listOf(
+            match("Home", "Away", "Nie rozegrano", "2026-11-18")
+                .copy(league = "League One"),
+            match("Home", "Away", "Nie rozegrano", "2026-11-18")
+                .copy(league = "League Two")
+        )
+        val ranked = DailyMatchRanker.rank(
+            matches = fixtures,
+            formByTeam = emptyMap(),
+            predictions = mapOf(
+                "League One|Home|Away" to leagueOnePrediction,
+                "League Two|Home|Away" to leagueTwoPrediction,
+                "Home|Away" to leagueOnePrediction
+            ),
+            limit = 10
+        ).associateBy { it.match.league }
+
+        assertEquals(70.0, ranked["League One"]?.prediction?.homeWin ?: -1.0, 0.0001)
+        assertEquals(15.0, ranked["League Two"]?.prediction?.homeWin ?: -1.0, 0.0001)
+    }
+
+    @Test
     fun globalFixtureStatusesAreTranslatedToPolish() {
         assertEquals("Nie rozpoczęto", fixtureStatusLabel("NS"))
         assertEquals("Koniec meczu", fixtureStatusLabel("FT"))

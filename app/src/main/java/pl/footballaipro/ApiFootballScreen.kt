@@ -40,9 +40,18 @@ private data class FixtureResearch(
 )
 
 @Composable
-fun ApiFootballScreen(context: Context) {
+fun ApiFootballScreen(
+    context: Context,
+    selectedDate: String,
+    onDateChanged: (String) -> Unit,
+    onFixturesLoaded: (List<FootballMatch>) -> Unit = {},
+    onSeasonMatchesLoaded: (List<FootballMatch>) -> Unit = {}
+) {
     var apiKey by remember { mutableStateOf(ApiFootballSettings.getApiKey(context)) }
-    var date by remember { mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())) }
+    var date by remember { mutableStateOf(selectedDate) }
+    LaunchedEffect(selectedDate) {
+        date = selectedDate
+    }
     var fixtures by remember { mutableStateOf(emptyList<ApiFootballFixture>()) }
     var selected by remember { mutableStateOf<ApiFootballFixture?>(null) }
     var research by remember { mutableStateOf<FixtureResearch?>(null) }
@@ -88,6 +97,7 @@ fun ApiFootballScreen(context: Context) {
             value = apiKey,
             onValueChange = { apiKey = it },
             modifier = Modifier.fillMaxWidth(),
+            enabled = !loading,
             singleLine = true,
             label = { Text("Klucz API-Football") },
             visualTransformation = if (showKey) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
@@ -115,6 +125,8 @@ fun ApiFootballScreen(context: Context) {
                 onClick = {
                     ApiFootballSettings.saveApiKey(context, "")
                     ApiFootballRepository.clearCache(context)
+                    onFixturesLoaded(emptyList())
+                    onSeasonMatchesLoaded(emptyList())
                     apiKey = ""
                     availableLeagues = emptyList()
                     selectedLeague = null
@@ -179,7 +191,11 @@ fun ApiFootballScreen(context: Context) {
 
         OutlinedTextField(
             value = date,
-            onValueChange = { date = it },
+            onValueChange = {
+                date = it
+                onDateChanged(it)
+                onFixturesLoaded(emptyList())
+            },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             label = { Text("Data (RRRR-MM-DD)") }
@@ -215,6 +231,8 @@ fun ApiFootballScreen(context: Context) {
                         onClick = {
                             selectedLeague = null
                             selectedSeason = null
+                            onFixturesLoaded(emptyList())
+                            onSeasonMatchesLoaded(emptyList())
                             standings = emptyList()
                             fixtures = emptyList()
                             selected = null
@@ -234,6 +252,8 @@ fun ApiFootballScreen(context: Context) {
                             onClick = {
                                 selectedLeague = league
                                 selectedSeason = league.season
+                                onFixturesLoaded(emptyList())
+                                onSeasonMatchesLoaded(emptyList())
                                 standings = emptyList()
                                 fixtures = emptyList()
                                 selected = null
@@ -266,6 +286,8 @@ fun ApiFootballScreen(context: Context) {
                             text = { Text(season.toString()) },
                             onClick = {
                                 selectedSeason = season
+                                onFixturesLoaded(emptyList())
+                                onSeasonMatchesLoaded(emptyList())
                                 standings = emptyList()
                                 fixtures = emptyList()
                                 selected = null
@@ -295,6 +317,7 @@ fun ApiFootballScreen(context: Context) {
                         selected = null
                         research = null
                         fixtures = emptyList()
+                        onFixturesLoaded(emptyList())
                         searchQuery = ""
                         status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
                         thread {
@@ -314,6 +337,16 @@ fun ApiFootballScreen(context: Context) {
                                         selectedSeason == seasonFilter
                                     ) {
                                         fixtures = result
+                                        onFixturesLoaded(result.map { fixture ->
+                                            FootballMatch(
+                                                league = fixture.leagueName,
+                                                home = fixture.home,
+                                                away = fixture.away,
+                                                score = fixture.score,
+                                                date = fixture.date,
+                                                source = "API-Football"
+                                            )
+                                        })
                                         val message = if (result.isEmpty()) {
                                             "Brak spotkań w bazie dla tej daty."
                                         } else "Znaleziono spotkań: " + result.size
@@ -354,6 +387,7 @@ fun ApiFootballScreen(context: Context) {
                         selected = null
                         research = null
                         fixtures = emptyList()
+                        onFixturesLoaded(emptyList())
                         searchQuery = ""
                         status = "Pobieram wyniki na żywo..."
                         thread {
@@ -366,6 +400,16 @@ fun ApiFootballScreen(context: Context) {
                                 Handler(Looper.getMainLooper()).post {
                                     if (selectedLeague?.id == leagueFilter?.id) {
                                         fixtures = result
+                                        onFixturesLoaded(result.map { fixture ->
+                                            FootballMatch(
+                                                league = fixture.leagueName,
+                                                home = fixture.home,
+                                                away = fixture.away,
+                                                score = fixture.score,
+                                                date = fixture.date,
+                                                source = "API-Football"
+                                            )
+                                        })
                                         status = if (result.isEmpty()) {
                                             "Brak trwających spotkań w dostępnych ligach."
                                         } else "Spotkania na żywo: " + result.size + " • odświeżanie ręczne"
@@ -439,6 +483,101 @@ fun ApiFootballScreen(context: Context) {
                 enabled = !loading && selectedLeague != null,
                 colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
             ) { Text("TABELA", fontSize = 11.sp) }
+        }
+
+        selectedLeague?.let { league ->
+            Button(
+                onClick = {
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val leagueForRequest = league
+                        val seasonForRequest = selectedSeason ?: league.season
+                        val requestedDate = date
+                        loading = true
+                        status = "Pobieram sezon i mecze na dzień ${requestedDate} dla ${league.name}..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchSeasonFixtures(
+                                    context,
+                                    keyForRequest,
+                                    leagueForRequest.id,
+                                    seasonForRequest
+                                )
+                                val dailyRequest = runCatching {
+                                    ApiFootballRepository.fetchFixtures(
+                                        context,
+                                        keyForRequest,
+                                        requestedDate,
+                                        leagueId = leagueForRequest.id,
+                                        season = seasonForRequest
+                                    )
+                                }
+                                val dailyResult = dailyRequest.getOrDefault(emptyList())
+                                val dailyError = dailyRequest.exceptionOrNull()?.message
+                                val settledCount = settleFinishedApiFixtures(context, result)
+                                val converted = result.map { fixture ->
+                                    FootballMatch(
+                                        league = fixture.leagueName,
+                                        home = fixture.home,
+                                        away = fixture.away,
+                                        score = fixture.score,
+                                        date = fixture.date,
+                                        source = "API-Football"
+                                    )
+                                }
+                                Handler(Looper.getMainLooper()).post {
+                                    if (
+                                        selectedLeague?.id == leagueForRequest.id &&
+                                        selectedSeason == seasonForRequest
+                                    ) {
+                                        onSeasonMatchesLoaded(converted)
+                                        if (date == requestedDate) {
+                                            fixtures = dailyResult
+                                            onFixturesLoaded(dailyResult.map { fixture ->
+                                                FootballMatch(
+                                                    league = fixture.leagueName,
+                                                    home = fixture.home,
+                                                    away = fixture.away,
+                                                    score = fixture.score,
+                                                    date = fixture.date,
+                                                    source = "API-Football"
+                                                )
+                                            })
+                                        }
+                                        status = "Sezon: ${converted.size} spotkań • rozliczono typów: ${settledCount}. " +
+                                            if (date != requestedDate) {
+                                                "Data została zmieniona — pobierz mecze dnia ponownie."
+                                            } else {
+                                                "Mecze ${requestedDate}: ${dailyResult.size}. " +
+                                                    (dailyError?.let { "Błąd pobierania meczów dnia: $it" }
+                                                        ?: "Dane są dostępne w TOP i teście historycznym.")
+                                            }
+                                    }
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    if (
+                                        selectedLeague?.id == leagueForRequest.id &&
+                                        selectedSeason == seasonForRequest &&
+                                        date == requestedDate
+                                    ) {
+                                        status = "Błąd pobierania sezonu i meczów: " + (e.message ?: "nieznany błąd")
+                                    }
+                                    loading = false
+                                }
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading,
+                colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
+            ) {
+                Text("POBIERZ SEZON I MECZE DO TOP", fontSize = 10.sp)
+            }
         }
 
         Text(status, color = ApiMuted, fontSize = 11.sp)

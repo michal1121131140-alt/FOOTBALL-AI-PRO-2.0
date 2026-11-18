@@ -26,6 +26,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -253,6 +255,8 @@ fun FootballApp(
     var leagues by remember { mutableStateOf(emptyList<FootballLeague>()) }
     var matches by remember { mutableStateOf(emptyList<FootballMatch>()) }
     var seasonMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
+    var globalMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
+    var globalSeasonMatches by remember { mutableStateOf(emptyList<FootballMatch>()) }
     var table by remember { mutableStateOf(emptyList<LeagueStanding>()) }
 
     var selectedLeague by remember { mutableStateOf<FootballLeague?>(null) }
@@ -291,50 +295,67 @@ fun FootballApp(
         }
     }
 
-    val formByTeam = remember(seasonMatches, date) {
-        val previous = seasonMatches.filter { it.date < date }
-
-        previous.flatMap { listOf(it.home, it.away) }
-            .distinct()
-            .associateWith { team ->
-                TeamFormAnalyzer.calculate(team, previous)
-            }
+    val combinedSeasonMatches = remember(seasonMatches, globalSeasonMatches) {
+        (seasonMatches + globalSeasonMatches).distinctBy {
+            "${it.league}|${it.home}|${it.away}|${it.date}"
+        }
+    }
+    val combinedDailyMatches = remember(matches, globalMatches, date) {
+        (matches.filter { it.date == date } + globalMatches.filter { it.date == date }).distinctBy {
+            "${it.league}|${it.home}|${it.away}|${it.date}"
+        }
     }
 
-    val rankedMatches = remember(matches, seasonMatches, formByTeam) {
-        val predictions = matches.mapNotNull { match ->
-            val previous = seasonMatches.filter { it.date < match.date }
-            val homeStats = buildTeamStats(match.home, previous)
-            val awayStats = buildTeamStats(match.away, previous)
+    var rankedMatches by remember { mutableStateOf(emptyList<RankedMatch>()) }
+    var rankingLoading by remember { mutableStateOf(false) }
 
-            if (homeStats != null && awayStats != null) {
-                try {
-                    val homeForm = formByTeam[match.home]
-                        ?: TeamFormAnalyzer.calculate(match.home, previous)
-                    val awayForm = formByTeam[match.away]
-                        ?: TeamFormAnalyzer.calculate(match.away, previous)
-                    val h2h = HeadToHeadAnalyzer.calculate(
-                        match.home, match.away, previous, 10
-                    )
-                    (match.home + "|" + match.away) to
-                        FootballAnalyzer.calculate(
-                            homeStats, awayStats, homeForm, awayForm, h2h
+    LaunchedEffect(combinedDailyMatches, combinedSeasonMatches, date) {
+        rankingLoading = true
+        rankedMatches = withContext(Dispatchers.Default) {
+            val previousForDate = combinedSeasonMatches.filter { it.date < date }
+            val formByTeam = previousForDate
+                .flatMap { listOf(it.home, it.away) }
+                .distinct()
+                .associateWith { team ->
+                    TeamFormAnalyzer.calculate(team, previousForDate)
+                }
+
+            val predictions = combinedDailyMatches.mapNotNull { match ->
+                val previous = combinedSeasonMatches.filter { it.date < match.date }
+                val homeStats = buildTeamStats(match.home, previous)
+                val awayStats = buildTeamStats(match.away, previous)
+
+                if (homeStats != null && awayStats != null) {
+                    try {
+                        val homeForm = formByTeam[match.home]
+                            ?: TeamFormAnalyzer.calculate(match.home, previous)
+                        val awayForm = formByTeam[match.away]
+                            ?: TeamFormAnalyzer.calculate(match.away, previous)
+                        val h2h = HeadToHeadAnalyzer.calculate(
+                            match.home, match.away, previous, 10
                         )
-                } catch (_: Exception) {
+                        (match.league + "|" + match.home + "|" + match.away) to
+                            FootballAnalyzer.calculate(
+                                homeStats, awayStats, homeForm, awayForm, h2h
+                            )
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
                     null
                 }
-            } else {
-                null
-            }
-        }.toMap()
+            }.toMap()
 
-        DailyMatchRanker.rank(
-            // TOP ma prezentować tylko spotkania, które nie mają jeszcze wyniku końcowego.
-            matches = matches.filter { FootballScoreParser.parse(it.score) == null },
-            formByTeam = formByTeam,
-            predictions = predictions,
-            limit = 10
-        )
+            DailyMatchRanker.rank(
+                matches = combinedDailyMatches.filter {
+                    FootballScoreParser.parse(it.score) == null
+                },
+                formByTeam = formByTeam,
+                predictions = predictions,
+                limit = 10
+            )
+        }
+        rankingLoading = false
     }
 
     MaterialTheme(
@@ -411,7 +432,27 @@ fun FootballApp(
 
             when (screen) {
                 "GLOBAL" -> {
-                    ApiFootballScreen(context = context)
+                    ApiFootballScreen(
+                        context = context,
+                        selectedDate = date,
+                        onDateChanged = { date = it },
+                        onFixturesLoaded = { loaded ->
+                            globalMatches = loaded
+                            if (loaded.isNotEmpty() && globalSeasonMatches.isNotEmpty()) {
+                                val refreshedKeys = loaded.map {
+                                    "${it.league}|${it.home}|${it.away}|${it.date}"
+                                }.toSet()
+                                globalSeasonMatches = (
+                                    globalSeasonMatches.filterNot {
+                                        "${it.league}|${it.home}|${it.away}|${it.date}" in refreshedKeys
+                                    } + loaded
+                                ).distinctBy {
+                                    "${it.league}|${it.home}|${it.away}|${it.date}"
+                                }
+                            }
+                        },
+                        onSeasonMatchesLoaded = { globalSeasonMatches = it }
+                    )
                 }
 
                 "MECZE" -> {
@@ -536,8 +577,24 @@ fun FootballApp(
                     )
                     Spacer(Modifier.height(10.dp))
 
-                    if (matches.isEmpty()) {
-                        InfoCard("Najpierw pobierz mecze w zakładce MECZE.")
+                    if (rankingLoading) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Blue
+                        )
+                    } else if (combinedDailyMatches.isEmpty()) {
+                        InfoCard("Pobierz mecze w zakładce MECZE lub GLOBAL.")
+                    } else if (rankedMatches.isEmpty()) {
+                        InfoCard("Brak spotkań do rankingu dla wybranej daty.")
+                    }
+
+                    if (
+                        combinedDailyMatches.any { it.source == "API-Football" } &&
+                        combinedSeasonMatches.none { it.source == "API-Football" }
+                    ) {
+                        InfoCard(
+                            "Aby TOP analizował mecze globalne, w zakładce GLOBAL wybierz konkretną ligę i pobierz jej sezon."
+                        )
                     }
 
                     LazyColumn(
@@ -719,40 +776,84 @@ fun FootballApp(
 
                             Button(
                                 onClick = {
-                                    val league = leagues.firstOrNull {
-                                        it.name == match.league
-                                    } ?: selectedLeague
+                                    analysisLoading = true
+                                    analysis = null
+                                    prediction = null
+                                    oddsAnalysis = null
 
-                                    if (league != null) {
-                                        analysisLoading = true
-                                        analysis = null
-                                        prediction = null
-                                        oddsAnalysis = null
-
-                                        loadAnalysis(league, match) { result, error ->
-                                            analysis = result
-                                            prediction = result?.let {
-                                                val previous = seasonMatches.filter {
-                                                    it.date < match.date
+                                    if (match.source == "API-Football") {
+                                        scope.launch {
+                                            try {
+                                                val result = withContext(Dispatchers.Default) {
+                                                    val previous = combinedSeasonMatches.filter {
+                                                        it.date < match.date
+                                                    }
+                                                    val homeStats = buildTeamStats(match.home, previous)
+                                                    val awayStats = buildTeamStats(match.away, previous)
+                                                    if (homeStats == null || awayStats == null) {
+                                                        null
+                                                    } else {
+                                                        val homeForm = TeamFormAnalyzer.calculate(
+                                                            match.home, previous
+                                                        )
+                                                        val awayForm = TeamFormAnalyzer.calculate(
+                                                            match.away, previous
+                                                        )
+                                                        val h2h = HeadToHeadAnalyzer.calculate(
+                                                            match.home, match.away, previous, 10
+                                                        )
+                                                        TeamAnalysisData(homeStats, awayStats) to
+                                                            FootballAnalyzer.calculate(
+                                                                homeStats, awayStats, homeForm, awayForm, h2h
+                                                            )
+                                                    }
                                                 }
-                                                val homeForm = TeamFormAnalyzer.calculate(
-                                                    match.home, previous
-                                                )
-                                                val awayForm = TeamFormAnalyzer.calculate(
-                                                    match.away, previous
-                                                )
-                                                val h2h = HeadToHeadAnalyzer.calculate(
-                                                    match.home, match.away, previous, 10
-                                                )
-                                                FootballAnalyzer.calculate(
-                                                    it.home, it.away, homeForm, awayForm, h2h
-                                                )
+                                                if (result != null) {
+                                                    analysis = result.first
+                                                    prediction = result.second
+                                                    status = "Analiza globalna zakończona na podstawie wcześniejszych meczów sezonu."
+                                                } else {
+                                                    status = "Brak wystarczającej historii. W GLOBAL pobierz cały sezon tej ligi."
+                                                }
+                                            } catch (e: Exception) {
+                                                status = "Błąd analizy globalnej: " +
+                                                    (e.message ?: "nieznany błąd")
+                                            } finally {
+                                                analysisLoading = false
                                             }
-                                            status = error ?: "Analiza zakończona."
-                                            analysisLoading = false
                                         }
                                     } else {
-                                        status = "Nie znaleziono ligi dla tego spotkania."
+                                        val league = leagues.firstOrNull {
+                                            it.name == match.league
+                                        } ?: selectedLeague
+
+                                        if (league != null) {
+                                            loadAnalysis(league, match) { result, error ->
+                                                analysis = result
+                                                prediction = result?.let {
+                                                    val previous = seasonMatches.filter {
+                                                        it.date < match.date
+                                                    }
+                                                    val homeForm = TeamFormAnalyzer.calculate(
+                                                        match.home, previous
+                                                    )
+                                                    val awayForm = TeamFormAnalyzer.calculate(
+                                                        match.away, previous
+                                                    )
+                                                    val h2h = HeadToHeadAnalyzer.calculate(
+                                                        match.home, match.away, previous, 10
+                                                    )
+                                                    FootballAnalyzer.calculate(
+                                                        it.home, it.away, homeForm, awayForm, h2h
+                                                    )
+                                                }
+                                                status = error ?: "Analiza zakończona."
+                                                analysisLoading = false
+                                            }
+                                        } else {
+                                            status = "Nie znaleziono ligi dla tego spotkania."
+                                            analysisLoading = false
+                                        }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -774,8 +875,13 @@ fun FootballApp(
 
                                 SectionTitle("FORMA OSTATNICH SPOTKAŃ")
 
+                                val analysisSeasonMatches = if (match.source == "API-Football") {
+                                    combinedSeasonMatches
+                                } else {
+                                    seasonMatches
+                                }
                                 val previousMatches =
-                                    seasonMatches.filter { it.date < match.date }
+                                    analysisSeasonMatches.filter { it.date < match.date }
 
                                 FormCard(
                                     TeamFormAnalyzer.calculate(
@@ -1172,7 +1278,7 @@ fun FootballApp(
                 }
 
                 "STATYSTYKI" -> {
-                    PerformanceScreen(seasonMatches)
+                    PerformanceScreen(combinedSeasonMatches)
                 }
             }
         }

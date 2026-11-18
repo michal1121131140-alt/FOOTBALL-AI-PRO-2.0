@@ -38,7 +38,8 @@ object DailyMatchRanker {
                 formByTeam[match.away]?.formRating ?: 0.0
 
             val prediction =
-                predictions[match.home + "|" + match.away]
+                predictions[match.league + "|" + match.home + "|" + match.away]
+                    ?: predictions[match.home + "|" + match.away]
 
             val confidence = prediction?.let {
                 maxOf(it.homeWin, it.draw, it.awayWin)
