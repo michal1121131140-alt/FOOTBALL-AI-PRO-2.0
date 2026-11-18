@@ -53,6 +53,10 @@ object ApiFootballSettings {
         val normalized = apiKey.trim()
         if (normalized.isEmpty()) {
             preferences.edit().remove(KEY_API).apply()
+            runCatching {
+                KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                    .deleteEntry(KEY_ALIAS)
+            }
             return
         }
 

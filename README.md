@@ -5,14 +5,15 @@ Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny pr
 ## Funkcje
 
 - **Mecze i rozgrywki:** terminarze i wyniki z OpenLigaDB dla dostępnych tam lig.
-- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, z filtrowaniem po lidze i drużynie.
+- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, filtrowanie po lidze, kraju i drużynie oraz ręczne odświeżanie wyników na żywo.
 - **Tabele:** tabela ligowa dla rozgrywek obsługiwanych przez OpenLigaDB.
 - **Analiza drużyn:** bilans, średnie goli, podział dom/wyjazd, ostatnia forma i H2H.
 - **Prognozy:** model Poissona dla 1X2, sumy goli i BTTS, a także pięć najbardziej prawdopodobnych dokładnych wyników.
 - **TOP 10:** ranking spotkań na podstawie prognozy i wiarygodności danych.
 - **Value Betting:** porównanie prawdopodobieństwa modelu z kursem dziesiętnym.
-- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników, skuteczność, ROI, bilans i eksport historii do CSV.
+- **Historia typów:** zapisywanie typów, automatyczne rozliczanie wyników (również dla pobranych zakończonych meczów API-Football), skuteczność, ROI, bilans, wyniki według rynku i eksport do CSV.
 - **Test historyczny:** sprawdzanie prognoz na podstawie wcześniejszych wyników, bez wykorzystywania wyniku analizowanego meczu.
+- **Eksport danych:** eksport historii typów i zapisanych spotkań do CSV.
 
 ## Źródła danych i konfiguracja
 
@@ -29,7 +30,7 @@ Zakładka GLOBAL korzysta z API-Football (API-Sports). Wymaga własnego klucza A
 3. Wklej klucz i wybierz ZAPISZ KLUCZ.
 4. Wybierz SPRAWDŹ API, a następnie pobierz mecze dla wybranej daty.
 
-Klucz jest szyfrowany lokalnie algorytmem AES-256-GCM, a klucz szyfrujący jest przechowywany w Android Keystore. Klucz API nie jest dodawany do repozytorium. Starszy zapis tekstowy jest migrowany do formatu szyfrowanego przy pierwszym odczycie. Liczba dostępnych lig, kursów, prognoz i absencji zależy od planu API-Football oraz limitów zapytań. Aplikacja buforuje odpowiedzi, aby ograniczać liczbę wywołań.
+Klucz jest szyfrowany lokalnie algorytmem AES-256-GCM, a klucz szyfrujący jest przechowywany w Android Keystore. Klucz API nie jest dodawany do repozytorium. Starszy zapis tekstowy jest migrowany do formatu szyfrowanego przy pierwszym odczycie. W zakładce GLOBAL można też usunąć klucz i wyczyścić lokalną pamięć odpowiedzi. Pamięć podręczna jest ograniczana do najnowszych wpisów; wyniki live są buforowane przez 30 sekund. Liczba dostępnych lig, kursów, prognoz i absencji zależy od planu API-Football oraz limitów zapytań. Aplikacja buforuje odpowiedzi, aby ograniczać liczbę wywołań.
 
 ## Jak działa model
 

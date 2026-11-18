@@ -59,6 +59,13 @@ data class ApiFootballOdds(
 object ApiFootballRepository {
     private const val BASE_URL = "https://v3.football.api-sports.io"
 
+    fun clearCache(context: Context) {
+        context.getSharedPreferences(
+            "api_football_response_cache",
+            Context.MODE_PRIVATE
+        ).edit().clear().apply()
+    }
+
     private fun request(context: Context, apiKey: String, path: String, query: Map<String, String> = emptyMap()): JSONObject {
         require(apiKey.isNotBlank()) { "Dodaj klucz API-Football w ustawieniach." }
         val queryString = query.entries.joinToString("&") { (key, value) ->
@@ -71,14 +78,15 @@ object ApiFootballRepository {
         val credentialFingerprint = MessageDigest.getInstance("SHA-256")
             .digest(apiKey.toByteArray(Charsets.UTF_8))
             .take(8)
-            .joinToString("") { byte -> "%02x".format(byte) }
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         val cacheKey = "response_" + credentialFingerprint + "_" +
             (path + "?" + queryString).hashCode()
         val cachedAt = cache.getLong(cacheKey + "_time", 0L)
-        val cacheTtl = when (path) {
-            "/leagues" -> 24L * 60L * 60L * 1000L
-            "/fixtures" -> 15L * 60L * 1000L
-            "/odds" -> 3L * 60L * 60L * 1000L
+        val cacheTtl = when {
+            path == "/fixtures" && queryString.contains("live=all") -> 30L * 1000L
+            path == "/leagues" -> 24L * 60L * 60L * 1000L
+            path == "/fixtures" -> 15L * 60L * 1000L
+            path == "/odds" -> 3L * 60L * 60L * 1000L
             else -> 6L * 60L * 60L * 1000L
         }
         if (System.currentTimeMillis() - cachedAt in 0..cacheTtl) {
@@ -119,10 +127,23 @@ object ApiFootballRepository {
                 .joinToString("; ")
             throw IllegalStateException("Błąd API-Football: $details")
         }
-        cache.edit()
+        val editor = cache.edit()
             .putString(cacheKey, body)
             .putLong(cacheKey + "_time", System.currentTimeMillis())
-            .apply()
+        val timestampKeys = cache.all.keys.filter {
+            it.startsWith("response_") && it.endsWith("_time")
+        }
+        if (timestampKeys.size > 200) {
+            val removeCount = timestampKeys.size - 150
+            timestampKeys
+                .sortedBy { cache.getLong(it, 0L) }
+                .take(removeCount)
+                .forEach { timestampKey ->
+                    val responseKey = timestampKey.removeSuffix("_time")
+                    editor.remove(responseKey).remove(timestampKey)
+                }
+        }
+        editor.apply()
         return json
     }
 
@@ -180,39 +201,76 @@ object ApiFootballRepository {
             val payload = request(context, apiKey, "/fixtures", query)
             totalPages = payload.optJSONObject("paging")?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
             val response = payload.optJSONArray("response") ?: JSONArray()
-            for (i in 0 until response.length()) {
-                val item = response.optJSONObject(i) ?: continue
-                val fixture = item.optJSONObject("fixture") ?: continue
-                val league = item.optJSONObject("league") ?: continue
-                val teams = item.optJSONObject("teams") ?: continue
-                val home = teams.optJSONObject("home")?.optString("name").orEmpty()
-                val away = teams.optJSONObject("away")?.optString("name").orEmpty()
-                if (home.isBlank() || away.isBlank()) continue
-
-                val goals = item.optJSONObject("goals")
-                val homeGoals = goals?.opt("home")
-                val awayGoals = goals?.opt("away")
-                val score = if (homeGoals != null && homeGoals != JSONObject.NULL &&
-                    awayGoals != null && awayGoals != JSONObject.NULL
-                ) "$homeGoals : $awayGoals" else "Nie rozegrano"
-
-                fixtures.add(
-                    ApiFootballFixture(
-                        id = fixture.optInt("id"),
-                        leagueId = league.optInt("id"),
-                        leagueName = league.optString("name"),
-                        home = home,
-                        away = away,
-                        date = fixture.optString("date").take(10),
-                        time = fixture.optString("date").substringAfter('T', "").take(5),
-                        status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
-                        score = score
-                    )
-                )
-            }
+            fixtures.addAll(parseFixtureResponse(response))
             page++
         } while (page <= totalPages && page <= 100)
-        return fixtures.distinctBy { it.id }.sortedBy { it.date }
+        return fixtures.distinctBy { it.id }.sortedWith(compareBy({ it.date }, { it.time }, { it.leagueName }))
+    }
+
+    fun fetchLiveFixtures(
+        context: Context,
+        apiKey: String,
+        leagueId: Int? = null
+    ): List<ApiFootballFixture> {
+        val baseQuery = linkedMapOf(
+            "live" to "all",
+            "timezone" to "Europe/Warsaw"
+        )
+        if (leagueId != null) baseQuery["league"] = leagueId.toString()
+
+        val fixtures = mutableListOf<ApiFootballFixture>()
+        var page = 1
+        var totalPages = 1
+        do {
+            val query = baseQuery.toMutableMap()
+            query["page"] = page.toString()
+            val payload = request(context, apiKey, "/fixtures", query)
+            totalPages = payload.optJSONObject("paging")
+                ?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
+            val response = payload.optJSONArray("response") ?: JSONArray()
+            fixtures.addAll(parseFixtureResponse(response))
+            page++
+        } while (page <= totalPages && page <= 100)
+
+        return fixtures.distinctBy { it.id }.sortedWith(
+            compareBy({ it.date }, { it.time }, { it.leagueName })
+        )
+    }
+
+    private fun parseFixtureResponse(response: JSONArray): List<ApiFootballFixture> {
+        val fixtures = mutableListOf<ApiFootballFixture>()
+        for (i in 0 until response.length()) {
+            val item = response.optJSONObject(i) ?: continue
+            val fixture = item.optJSONObject("fixture") ?: continue
+            val league = item.optJSONObject("league") ?: continue
+            val teams = item.optJSONObject("teams") ?: continue
+            val home = teams.optJSONObject("home")?.optString("name").orEmpty()
+            val away = teams.optJSONObject("away")?.optString("name").orEmpty()
+            if (home.isBlank() || away.isBlank()) continue
+
+            val goals = item.optJSONObject("goals")
+            val homeGoals = goals?.opt("home")
+            val awayGoals = goals?.opt("away")
+            val score = if (
+                homeGoals != null && homeGoals != JSONObject.NULL &&
+                awayGoals != null && awayGoals != JSONObject.NULL
+            ) "$homeGoals : $awayGoals" else "Nie rozegrano"
+
+            fixtures.add(
+                ApiFootballFixture(
+                    id = fixture.optInt("id"),
+                    leagueId = league.optInt("id"),
+                    leagueName = league.optString("name"),
+                    home = home,
+                    away = away,
+                    date = fixture.optString("date").take(10),
+                    time = fixture.optString("date").substringAfter('T', "").take(5),
+                    status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
+                    score = score
+                )
+            )
+        }
+        return fixtures
     }
 
     fun fetchPredictions(context: Context, apiKey: String, fixtureId: Int): ApiFootballPredictionData? {

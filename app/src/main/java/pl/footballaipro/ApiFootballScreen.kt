@@ -6,6 +6,8 @@ import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +55,7 @@ fun ApiFootballScreen(context: Context) {
     var leagueMenuExpanded by remember { mutableStateOf(false) }
     var leagueQuery by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var stakeInput by remember { mutableStateOf("1.00") }
     val filteredLeagues = remember(availableLeagues, leagueQuery) {
         val query = leagueQuery.trim()
         if (query.isBlank()) availableLeagues else availableLeagues.filter { league ->
@@ -84,15 +87,42 @@ fun ApiFootballScreen(context: Context) {
             trailingIcon = { TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "UKRYJ" else "POKAŻ") } }
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(
                 onClick = {
-                    ApiFootballSettings.saveApiKey(context, apiKey)
-                    status = "Klucz zapisany na tym urządzeniu."
+                    status = runCatching {
+                        ApiFootballSettings.saveApiKey(context, apiKey)
+                        "Klucz zapisany i zaszyfrowany na tym urządzeniu."
+                    }.getOrElse {
+                        "Nie udało się zapisać klucza: " + (it.message ?: "błąd Android Keystore")
+                    }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
-            ) { Text("ZAPISZ KLUCZ") }
+            ) { Text("ZAPISZ", fontSize = 10.sp) }
+
+            Button(
+                onClick = {
+                    ApiFootballSettings.saveApiKey(context, "")
+                    ApiFootballRepository.clearCache(context)
+                    apiKey = ""
+                    availableLeagues = emptyList()
+                    selectedLeague = null
+                    leagueCount = null
+                    leagueQuery = ""
+                    searchQuery = ""
+                    fixtures = emptyList()
+                    selected = null
+                    research = null
+                    status = "Klucz API i lokalny cache zostały usunięte."
+                },
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+            ) { Text("USUŃ KLUCZ", fontSize = 10.sp) }
 
             Button(
                 onClick = {
@@ -124,8 +154,10 @@ fun ApiFootballScreen(context: Context) {
                     }
                 },
                 modifier = Modifier.weight(1f),
+                enabled = !loading,
+                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
-            ) { Text("SPRAWDŹ API") }
+            ) { Text("SPRAWDŹ", fontSize = 10.sp) }
         }
 
         OutlinedTextField(
@@ -187,46 +219,98 @@ fun ApiFootballScreen(context: Context) {
             }
         }
 
-        Button(
-            onClick = {
-                if (apiKey.isBlank()) {
-                    status = "Wpisz klucz API-Football."
-                } else if (!FootballDateValidator.isValid(date)) {
-                    status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
-                } else {
-                    val keyForRequest = apiKey.trim()
-                    val requestedDate = date
-                    val leagueFilter = selectedLeague
-                    loading = true
-                    selected = null
-                    research = null
-                    status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
-                    thread {
-                        try {
-                            val result = ApiFootballRepository.fetchFixtures(
-                                context,
-                                keyForRequest,
-                                requestedDate,
-                                leagueId = leagueFilter?.id,
-                                season = leagueFilter?.season
-                            )
-                            Handler(Looper.getMainLooper()).post {
-                                fixtures = result
-                                status = if (result.isEmpty()) "Brak spotkań w bazie dla tej daty." else "Znaleziono spotkań: " + result.size
-                                loading = false
-                            }
-                        } catch (e: Exception) {
-                            Handler(Looper.getMainLooper()).post {
-                                status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
-                                loading = false
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else if (!FootballDateValidator.isValid(date)) {
+                        status = "Nieprawidłowa data. Użyj formatu RRRR-MM-DD."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val requestedDate = date
+                        val leagueFilter = selectedLeague
+                        loading = true
+                        selected = null
+                        research = null
+                        fixtures = emptyList()
+                        searchQuery = ""
+                        status = "Pobieram spotkania: " + (leagueFilter?.name ?: "wszystkie ligi") + "..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchFixtures(
+                                    context,
+                                    keyForRequest,
+                                    requestedDate,
+                                    leagueId = leagueFilter?.id,
+                                    season = leagueFilter?.season
+                                )
+                                val settledCount = settleFinishedApiFixtures(context, result)
+                                Handler(Looper.getMainLooper()).post {
+                                    fixtures = result
+                                    val message = if (result.isEmpty()) {
+                                        "Brak spotkań w bazie dla tej daty."
+                                    } else "Znaleziono spotkań: " + result.size
+                                    status = message + if (settledCount > 0) {
+                                        " • rozliczono typów: " + settledCount
+                                    } else ""
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
+                                    loading = false
+                                }
                             }
                         }
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
-        ) { Text("POBIERZ WSZYSTKIE MECZE") }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
+            ) { Text("MECZE Z DATY", fontSize = 11.sp) }
+
+            Button(
+                onClick = {
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val leagueFilter = selectedLeague
+                        loading = true
+                        selected = null
+                        research = null
+                        fixtures = emptyList()
+                        searchQuery = ""
+                        status = "Pobieram wyniki na żywo..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchLiveFixtures(
+                                    context,
+                                    keyForRequest,
+                                    leagueId = leagueFilter?.id
+                                )
+                                Handler(Looper.getMainLooper()).post {
+                                    fixtures = result
+                                    status = if (result.isEmpty()) {
+                                        "Brak trwających spotkań w dostępnych ligach."
+                                    } else "Spotkania na żywo: " + result.size + " • odświeżanie ręczne"
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    status = "Błąd pobierania live: " + (e.message ?: "nieznany błąd")
+                                    loading = false
+                                }
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = !loading,
+                colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
+            ) { Text("NA ŻYWO", fontSize = 11.sp) }
+        }
 
         Text(status, color = ApiMuted, fontSize = 11.sp)
         if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = ApiBlue)
@@ -249,12 +333,24 @@ fun ApiFootballScreen(context: Context) {
 
         selected?.let { fixture ->
             Column(
-                modifier = Modifier.fillMaxWidth().background(ApiPanel, RoundedCornerShape(12.dp)).padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 240.dp)
+                    .background(ApiPanel, RoundedCornerShape(12.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("ANALIZA MECZU", color = ApiBlue, fontWeight = FontWeight.Bold)
                 Text(fixture.home + " — " + fixture.away, color = ApiWhite, fontWeight = FontWeight.Bold)
                 Text(fixture.leagueName + " • " + fixture.date + " " + fixture.time, color = ApiMuted, fontSize = 11.sp)
+                Text(
+                    if (fixture.score == "Nie rozegrano") fixtureStatusLabel(fixture.status)
+                    else "Wynik: " + fixture.score + " • " + fixtureStatusLabel(fixture.status),
+                    color = ApiGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
 
                 if (research == null) {
                     Button(
@@ -304,6 +400,7 @@ fun ApiFootballScreen(context: Context) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        enabled = !loading,
                         colors = ButtonDefaults.buttonColors(containerColor = ApiBlue)
                     ) { Text("URUCHOM ANALIZĘ 1X2") }
                 } else {
@@ -333,11 +430,19 @@ fun ApiFootballScreen(context: Context) {
                     }
 
                     Text("KURSY BUKMACHERSKIE", color = ApiBlue, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = stakeInput,
+                        onValueChange = { stakeInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Stawka do zapisania typu") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
                     val marketOdds = data.odds.filter {
                         it.market.contains("match winner", true) ||
                         it.market.contains("1x2", true) ||
                         it.market.equals("fulltime result", true)
-                    }
+                    }.sortedByDescending { it.odd.toDoubleOrNull() ?: 0.0 }
                     if (marketOdds.isEmpty()) {
                         Text("Brak kursów 1X2 w bazie dla tego meczu. Pokrycie zależy od ligi i bukmachera.", color = ApiMuted, fontSize = 11.sp)
                     } else {
@@ -348,6 +453,7 @@ fun ApiFootballScreen(context: Context) {
                                 "away" to parseApiPercent(it.awayWin)
                             )
                         } ?: emptyMap()
+                        val saveButtonSelections = mutableSetOf<String>()
                         marketOdds.take(24).forEach { odd ->
                             val selection = odd.selection.lowercase(Locale.ROOT)
                             val key = when {
@@ -361,7 +467,50 @@ fun ApiFootballScreen(context: Context) {
                             val value = if (probability != null && decimalOdd != null && decimalOdd > 1.0) {
                                 runCatching { ValueBetting.calculate(probability, decimalOdd) }.getOrNull()
                             } else null
+                            val betSelection = when (key) {
+                                "home" -> PredictionPerformance.HOME_WIN
+                                "draw" -> PredictionPerformance.DRAW
+                                "away" -> PredictionPerformance.AWAY_WIN
+                                else -> null
+                            }
                             Text(odd.bookmaker + " • " + odd.selection + ": " + odd.odd, color = ApiWhite, fontSize = 11.sp)
+                            if (
+                                value != null && betSelection != null &&
+                                probability != null && decimalOdd != null &&
+                                !isFinishedFixture(fixture.status) &&
+                                saveButtonSelections.add(key)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val stake = stakeInput.replace(",", ".").toDoubleOrNull()
+                                        if (stake == null || stake <= 0.0 || !stake.isFinite()) {
+                                            status = "Podaj prawidłową stawkę większą od zera."
+                                        } else {
+                                            val matchRecord = FootballMatch(
+                                                league = fixture.leagueName,
+                                                home = fixture.home,
+                                                away = fixture.away,
+                                                score = fixture.score,
+                                                date = fixture.date,
+                                                source = "API-Football"
+                                            )
+                                            val record = PredictionPerformance.createRecord(
+                                                match = matchRecord,
+                                                selection = betSelection,
+                                                odds = decimalOdd,
+                                                probability = probability,
+                                                stake = stake
+                                            )
+                                            PredictionPerformance.save(context, record)
+                                            status = "Typ zapisany w historii: ${fixture.home} — ${fixture.away}."
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
+                                ) {
+                                    Text("ZAPISZ TYP DO HISTORII")
+                                }
+                            }
                             if (value != null) {
                                 Text(
                                     "Model: " + String.format(Locale.US, "%.1f%%", value.modelProbability) +
@@ -442,3 +591,30 @@ internal fun fixtureStatusLabel(status: String): String = when (status.uppercase
     "LIVE" -> "Na żywo"
     else -> status.ifBlank { "Brak statusu" }
 }
+
+internal fun isFinishedFixture(status: String): Boolean =
+    status.uppercase(Locale.ROOT) in setOf("FT", "AET", "PEN", "AWD", "WO")
+
+private fun settleFinishedApiFixtures(
+    context: Context,
+    fixtures: List<ApiFootballFixture>
+): Int {
+    return fixtures.sumOf { fixture ->
+        if (!isFinishedFixture(fixture.status)) {
+            0
+        } else {
+            PredictionPerformance.settleMatch(
+                context,
+                FootballMatch(
+                    league = fixture.leagueName,
+                    home = fixture.home,
+                    away = fixture.away,
+                    score = fixture.score,
+                    date = fixture.date,
+                    source = "API-Football"
+                )
+            )
+        }
+    }
+}
+
