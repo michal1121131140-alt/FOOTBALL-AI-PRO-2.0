@@ -301,7 +301,7 @@ fun FootballApp(
         }
     }
     val combinedDailyMatches = remember(matches, globalMatches, date) {
-        (matches + globalMatches.filter { it.date == date }).distinctBy {
+        (matches.filter { it.date == date } + globalMatches.filter { it.date == date }).distinctBy {
             "${it.league}|${it.home}|${it.away}|${it.date}"
         }
     }
