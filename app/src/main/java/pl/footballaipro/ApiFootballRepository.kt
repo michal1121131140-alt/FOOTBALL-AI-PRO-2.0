@@ -99,30 +99,35 @@ object ApiFootballRepository {
     }
 
     fun fetchCurrentLeagues(apiKey: String, season: Int): List<ApiFootballLeague> {
-        val response = request(
-            apiKey,
-            "/leagues",
-            mapOf("season" to season.toString())
-        ).optJSONArray("response") ?: JSONArray()
-
         val leagues = mutableListOf<ApiFootballLeague>()
-        for (i in 0 until response.length()) {
-            val item = response.optJSONObject(i) ?: continue
-            val league = item.optJSONObject("league") ?: continue
-            val country = item.optJSONObject("country")?.optString("name").orEmpty()
-            val seasons = item.optJSONArray("seasons") ?: JSONArray()
-            val seasonAvailable = (0 until seasons.length()).any { index ->
-                seasons.optJSONObject(index)?.optInt("year") == season
+        var page = 1
+        var totalPages = 1
+        do {
+            val payload = request(
+                apiKey,
+                "/leagues",
+                mapOf("season" to season.toString(), "page" to page.toString())
+            )
+            totalPages = payload.optJSONObject("paging")?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
+            val response = payload.optJSONArray("response") ?: JSONArray()
+            for (i in 0 until response.length()) {
+                val item = response.optJSONObject(i) ?: continue
+                val league = item.optJSONObject("league") ?: continue
+                val country = item.optJSONObject("country")?.optString("name").orEmpty()
+                val seasons = item.optJSONArray("seasons") ?: JSONArray()
+                val seasonAvailable = (0 until seasons.length()).any { index ->
+                    seasons.optJSONObject(index)?.optInt("year") == season
+                }
+                if (!seasonAvailable) continue
+                val id = league.optInt("id")
+                val name = league.optString("name")
+                if (id > 0 && name.isNotBlank()) {
+                    leagues.add(ApiFootballLeague(id, name, country, season))
+                }
             }
-            if (!seasonAvailable) continue
-
-            val id = league.optInt("id")
-            val name = league.optString("name")
-            if (id > 0 && name.isNotBlank()) {
-                leagues.add(ApiFootballLeague(id, name, country, season))
-            }
-        }
-        return leagues.sortedWith(compareBy({ it.country }, { it.name }))
+            page++
+        } while (page <= totalPages && page <= 10)
+        return leagues.distinctBy { it.id }.sortedWith(compareBy({ it.country }, { it.name }))
     }
 
     fun fetchFixtures(
@@ -131,45 +136,52 @@ object ApiFootballRepository {
         leagueId: Int? = null,
         season: Int? = null
     ): List<ApiFootballFixture> {
-        val query = linkedMapOf("date" to date, "timezone" to "Europe/Warsaw")
+        val baseQuery = linkedMapOf("date" to date, "timezone" to "Europe/Warsaw")
         if (leagueId != null && season != null) {
-            query["league"] = leagueId.toString()
-            query["season"] = season.toString()
+            baseQuery["league"] = leagueId.toString()
+            baseQuery["season"] = season.toString()
         }
-        val response = request(apiKey, "/fixtures", query)
-            .optJSONArray("response") ?: JSONArray()
-
         val fixtures = mutableListOf<ApiFootballFixture>()
-        for (i in 0 until response.length()) {
-            val item = response.optJSONObject(i) ?: continue
-            val fixture = item.optJSONObject("fixture") ?: continue
-            val league = item.optJSONObject("league") ?: continue
-            val teams = item.optJSONObject("teams") ?: continue
-            val home = teams.optJSONObject("home")?.optString("name").orEmpty()
-            val away = teams.optJSONObject("away")?.optString("name").orEmpty()
-            if (home.isBlank() || away.isBlank()) continue
+        var page = 1
+        var totalPages = 1
+        do {
+            val query = baseQuery.toMutableMap()
+            query["page"] = page.toString()
+            val payload = request(apiKey, "/fixtures", query)
+            totalPages = payload.optJSONObject("paging")?.optInt("total", 1)?.coerceAtLeast(1) ?: 1
+            val response = payload.optJSONArray("response") ?: JSONArray()
+            for (i in 0 until response.length()) {
+                val item = response.optJSONObject(i) ?: continue
+                val fixture = item.optJSONObject("fixture") ?: continue
+                val league = item.optJSONObject("league") ?: continue
+                val teams = item.optJSONObject("teams") ?: continue
+                val home = teams.optJSONObject("home")?.optString("name").orEmpty()
+                val away = teams.optJSONObject("away")?.optString("name").orEmpty()
+                if (home.isBlank() || away.isBlank()) continue
 
-            val goals = item.optJSONObject("goals")
-            val homeGoals = goals?.opt("home")
-            val awayGoals = goals?.opt("away")
-            val score = if (homeGoals != null && homeGoals != JSONObject.NULL &&
-                awayGoals != null && awayGoals != JSONObject.NULL
-            ) "$homeGoals : $awayGoals" else "Nie rozegrano"
+                val goals = item.optJSONObject("goals")
+                val homeGoals = goals?.opt("home")
+                val awayGoals = goals?.opt("away")
+                val score = if (homeGoals != null && homeGoals != JSONObject.NULL &&
+                    awayGoals != null && awayGoals != JSONObject.NULL
+                ) "$homeGoals : $awayGoals" else "Nie rozegrano"
 
-            fixtures.add(
-                ApiFootballFixture(
-                    id = fixture.optInt("id"),
-                    leagueId = league.optInt("id"),
-                    leagueName = league.optString("name"),
-                    home = home,
-                    away = away,
-                    date = fixture.optString("date").take(10),
-                    status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
-                    score = score
+                fixtures.add(
+                    ApiFootballFixture(
+                        id = fixture.optInt("id"),
+                        leagueId = league.optInt("id"),
+                        leagueName = league.optString("name"),
+                        home = home,
+                        away = away,
+                        date = fixture.optString("date").take(10),
+                        status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
+                        score = score
+                    )
                 )
-            )
-        }
-        return fixtures
+            }
+            page++
+        } while (page <= totalPages && page <= 10)
+        return fixtures.distinctBy { it.id }.sortedBy { it.date }
     }
 
     fun fetchPredictions(apiKey: String, fixtureId: Int): ApiFootballPredictionData? {
