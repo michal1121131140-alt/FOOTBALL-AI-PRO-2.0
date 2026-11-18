@@ -326,7 +326,13 @@ fun ApiFootballScreen(context: Context) {
                 ) {
                     Text(fixture.home + " — " + fixture.away, color = ApiWhite, fontWeight = FontWeight.Bold)
                     Text(fixture.leagueName + " • " + fixture.date + " " + fixture.time, color = ApiMuted, fontSize = 11.sp)
-                    Text(if (fixture.score == "Nie rozegrano") fixture.status else fixture.score, color = ApiBlue, fontSize = 11.sp)
+                    Text(
+                        if (fixture.score == "Nie rozegrano") {
+                            fixtureStatusLabel(fixture.status)
+                        } else fixture.score,
+                        color = ApiBlue,
+                        fontSize = 11.sp
+                    )
                 }
             }
         }
@@ -337,4 +343,27 @@ private fun parseApiPercent(value: String): Double? {
     val normalized = value.replace(",", ".")
     val match = Regex("[0-9]+(?:\\.[0-9]+)?").find(normalized) ?: return null
     return match.value.toDoubleOrNull()?.takeIf { it in 0.01..100.0 }
+}
+
+internal fun fixtureStatusLabel(status: String): String = when (status.uppercase(Locale.ROOT)) {
+    "TBD" -> "Godzina do potwierdzenia"
+    "NS" -> "Nie rozpoczęto"
+    "1H" -> "1. połowa"
+    "HT" -> "Przerwa"
+    "2H" -> "2. połowa"
+    "ET" -> "Dogrywka"
+    "BT" -> "Przerwa przed dogrywką"
+    "P" -> "Rzuty karne"
+    "SUSP" -> "Mecz zawieszony"
+    "INT" -> "Mecz przerwany"
+    "FT" -> "Koniec meczu"
+    "AET" -> "Koniec po dogrywce"
+    "PEN" -> "Koniec po rzutach karnych"
+    "PST" -> "Mecz przełożony"
+    "CANC" -> "Mecz odwołany"
+    "ABD" -> "Mecz przerwany"
+    "AWD" -> "Walkower"
+    "WO" -> "Walkower"
+    "LIVE" -> "Na żywo"
+    else -> status.ifBlank { "Brak statusu" }
 }
