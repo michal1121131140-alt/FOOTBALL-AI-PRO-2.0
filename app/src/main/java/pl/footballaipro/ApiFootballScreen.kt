@@ -6,6 +6,8 @@ import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -321,7 +323,12 @@ fun ApiFootballScreen(context: Context) {
 
         selected?.let { fixture ->
             Column(
-                modifier = Modifier.fillMaxWidth().background(ApiPanel, RoundedCornerShape(12.dp)).padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp)
+                    .background(ApiPanel, RoundedCornerShape(12.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("ANALIZA MECZU", color = ApiBlue, fontWeight = FontWeight.Bold)
