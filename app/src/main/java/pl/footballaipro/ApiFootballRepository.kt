@@ -184,7 +184,7 @@ object ApiFootballRepository {
             fixtures.addAll(parseFixtureResponse(response))
             page++
         } while (page <= totalPages && page <= 100)
-        return fixtures.distinctBy { it.id }.sortedBy { it.date }
+        return fixtures.distinctBy { it.id }.sortedWith(compareBy({ it.date }, { it.time }, { it.leagueName }))
     }
 
     fun fetchLiveFixtures(
