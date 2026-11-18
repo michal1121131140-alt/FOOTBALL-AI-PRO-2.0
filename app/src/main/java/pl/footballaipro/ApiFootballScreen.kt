@@ -52,7 +52,10 @@ fun ApiFootballScreen(context: Context) {
     var leagueCount by remember { mutableStateOf<Int?>(null) }
     var availableLeagues by remember { mutableStateOf(emptyList<ApiFootballLeague>()) }
     var selectedLeague by remember { mutableStateOf<ApiFootballLeague?>(null) }
+    var selectedSeason by remember { mutableStateOf<Int?>(null) }
     var leagueMenuExpanded by remember { mutableStateOf(false) }
+    var seasonMenuExpanded by remember { mutableStateOf(false) }
+    var standings by remember { mutableStateOf(emptyList<ApiFootballStanding>()) }
     var leagueQuery by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
     var stakeInput by remember { mutableStateOf("1.00") }
@@ -141,6 +144,11 @@ fun ApiFootballScreen(context: Context) {
                                     availableLeagues = result
                                     leagueCount = result.size
                                     selectedLeague = null
+                                    selectedSeason = null
+                                    standings = emptyList()
+                                    fixtures = emptyList()
+                                    selected = null
+                                    research = null
                                     status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
                                     loading = false
                                 }
@@ -197,6 +205,11 @@ fun ApiFootballScreen(context: Context) {
                         text = { Text("Wszystkie ligi") },
                         onClick = {
                             selectedLeague = null
+                            selectedSeason = null
+                            standings = emptyList()
+                            fixtures = emptyList()
+                            selected = null
+                            research = null
                             leagueMenuExpanded = false
                         }
                     )
@@ -211,7 +224,45 @@ fun ApiFootballScreen(context: Context) {
                             },
                             onClick = {
                                 selectedLeague = league
+                                selectedSeason = league.seasons.firstOrNull() ?: league.season
+                                standings = emptyList()
+                                fixtures = emptyList()
+                                selected = null
+                                research = null
                                 leagueMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        selectedLeague?.let { league ->
+            Text("SEZON ROZGRYWKI", color = ApiMuted, fontSize = 10.sp)
+            Box {
+                Button(
+                    onClick = { seasonMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+                ) {
+                    Text("Sezon " + (selectedSeason ?: league.season), color = ApiWhite)
+                }
+                DropdownMenu(
+                    expanded = seasonMenuExpanded,
+                    onDismissRequest = { seasonMenuExpanded = false },
+                    modifier = Modifier.heightIn(max = 300.dp)
+                ) {
+                    league.seasons.forEach { season ->
+                        DropdownMenuItem(
+                            text = { Text(season.toString()) },
+                            onClick = {
+                                selectedSeason = season
+                                standings = emptyList()
+                                fixtures = emptyList()
+                                selected = null
+                                research = null
+                                searchQuery = ""
+                                seasonMenuExpanded = false
                             }
                         )
                     }
@@ -230,6 +281,7 @@ fun ApiFootballScreen(context: Context) {
                         val keyForRequest = apiKey.trim()
                         val requestedDate = date
                         val leagueFilter = selectedLeague
+                        val seasonFilter = leagueFilter?.let { selectedSeason ?: it.season }
                         loading = true
                         selected = null
                         research = null
@@ -243,7 +295,7 @@ fun ApiFootballScreen(context: Context) {
                                     keyForRequest,
                                     requestedDate,
                                     leagueId = leagueFilter?.id,
-                                    season = leagueFilter?.season
+                                    season = seasonFilter
                                 )
                                 val settledCount = settleFinishedApiFixtures(context, result)
                                 Handler(Looper.getMainLooper()).post {
@@ -310,6 +362,48 @@ fun ApiFootballScreen(context: Context) {
                 enabled = !loading,
                 colors = ButtonDefaults.buttonColors(containerColor = ApiGreen)
             ) { Text("NA ŻYWO", fontSize = 11.sp) }
+
+            Button(
+                onClick = {
+                    val leagueFilter = selectedLeague
+                    if (apiKey.isBlank()) {
+                        status = "Wpisz klucz API-Football."
+                    } else if (leagueFilter == null) {
+                        status = "Wybierz ligę, aby pobrać jej tabelę."
+                    } else {
+                        val keyForRequest = apiKey.trim()
+                        val seasonForRequest = selectedSeason ?: leagueFilter.season
+                        loading = true
+                        standings = emptyList()
+                        status = "Pobieram tabelę: ${leagueFilter.name}..."
+                        thread {
+                            try {
+                                val result = ApiFootballRepository.fetchStandings(
+                                    context,
+                                    keyForRequest,
+                                    leagueFilter.id,
+                                    seasonForRequest
+                                )
+                                Handler(Looper.getMainLooper()).post {
+                                    standings = result
+                                    status = if (result.isEmpty()) {
+                                        "Brak tabeli dla tej ligi i sezonu w API-Football."
+                                    } else "Tabela załadowana: " + result.size + " drużyn."
+                                    loading = false
+                                }
+                            } catch (e: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    status = "Błąd tabeli: " + (e.message ?: "nieznany błąd")
+                                    loading = false
+                                }
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = !loading && selectedLeague != null,
+                colors = ButtonDefaults.buttonColors(containerColor = ApiPanel)
+            ) { Text("TABELA", fontSize = 11.sp) }
         }
 
         Text(status, color = ApiMuted, fontSize = 11.sp)
@@ -540,8 +634,47 @@ fun ApiFootballScreen(context: Context) {
             }
         }
 
-        Text("MECZE (" + fixtures.size + ")", color = ApiWhite, fontWeight = FontWeight.Bold)
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            if (standings.isNotEmpty()) {
+                item {
+                    Text(
+                        "TABELA LIGI • " + (selectedLeague?.name ?: ""),
+                        color = ApiWhite,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                items(standings) { standing ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ApiPanel, RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "${standing.rank}. ${standing.team}",
+                                modifier = Modifier.weight(1f),
+                                color = ApiWhite,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text("${standing.points} pkt", color = ApiGreen, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "M: ${standing.played} • W/R/P: ${standing.wins}/${standing.draws}/${standing.losses} • " +
+                                "Bramki: ${standing.goalsFor}:${standing.goalsAgainst} • Bilans: ${standing.goalDifference}",
+                            color = ApiMuted,
+                            fontSize = 10.sp
+                        )
+                        if (standing.form.isNotBlank()) {
+                            Text("Forma: ${standing.form}", color = ApiBlue, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+            item {
+                Text("MECZE (" + fixtures.size + ")", color = ApiWhite, fontWeight = FontWeight.Bold)
+            }
             items(filteredFixtures) { fixture ->
                 Column(
                     modifier = Modifier.fillMaxWidth().background(ApiPanel, RoundedCornerShape(10.dp))
