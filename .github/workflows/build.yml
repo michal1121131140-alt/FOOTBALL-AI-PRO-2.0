@@ -32,6 +32,9 @@ jobs:
       - name: Build APK
         run: gradle --no-daemon testDebugUnitTest assembleDebug
 
+      - name: Name APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/FOOTBALL-AI-PRO-2.0.2.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
