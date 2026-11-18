@@ -5,8 +5,8 @@ Aplikacja Android do analizy spotkań piłkarskich, statystyk drużyn i oceny pr
 ## Funkcje
 
 - **Mecze i rozgrywki:** terminarze i wyniki z OpenLigaDB dla dostępnych tam lig.
-- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, filtrowanie po lidze, kraju i drużynie oraz ręczne odświeżanie wyników na żywo.
-- **Tabele:** tabela ligowa dla rozgrywek obsługiwanych przez OpenLigaDB.
+- **Globalne mecze:** wyszukiwanie spotkań według daty z API-Football, filtrowanie po lidze, kraju i drużynie, wybór sezonu oraz ręczne odświeżanie wyników na żywo.
+- **Tabele:** tabele OpenLigaDB oraz tabele API-Football dla wybranej ligi i sezonu.
 - **Analiza drużyn:** bilans, średnie goli, podział dom/wyjazd, ostatnia forma i H2H.
 - **Prognozy:** model Poissona dla 1X2, sumy goli i BTTS, a także pięć najbardziej prawdopodobnych dokładnych wyników.
 - **TOP 10:** ranking spotkań na podstawie prognozy i wiarygodności danych.
