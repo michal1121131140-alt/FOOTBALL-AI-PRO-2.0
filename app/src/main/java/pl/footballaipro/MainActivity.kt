@@ -454,7 +454,7 @@ fun FootballApp(
                         onClick = {
                             val league = selectedLeague
                             if (league != null &&
-                                date.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))
+                                FootballDateValidator.isValid(date)
                             ) {
                                 loading = true
                                 status = "Pobieranie meczów..."
