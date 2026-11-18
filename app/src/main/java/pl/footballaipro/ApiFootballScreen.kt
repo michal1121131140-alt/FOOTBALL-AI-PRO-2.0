@@ -146,6 +146,9 @@ fun ApiFootballScreen(context: Context) {
                                     selectedLeague = null
                                     selectedSeason = null
                                     standings = emptyList()
+                                    fixtures = emptyList()
+                                    selected = null
+                                    research = null
                                     status = "Klucz działa. Dostępne ligi w bieżącym sezonie: " + result.size
                                     loading = false
                                 }
@@ -204,6 +207,9 @@ fun ApiFootballScreen(context: Context) {
                             selectedLeague = null
                             selectedSeason = null
                             standings = emptyList()
+                            fixtures = emptyList()
+                            selected = null
+                            research = null
                             leagueMenuExpanded = false
                         }
                     )
@@ -253,6 +259,9 @@ fun ApiFootballScreen(context: Context) {
                                 selectedSeason = season
                                 standings = emptyList()
                                 fixtures = emptyList()
+                                selected = null
+                                research = null
+                                searchQuery = ""
                                 seasonMenuExpanded = false
                             }
                         )
@@ -272,6 +281,7 @@ fun ApiFootballScreen(context: Context) {
                         val keyForRequest = apiKey.trim()
                         val requestedDate = date
                         val leagueFilter = selectedLeague
+                        val seasonFilter = leagueFilter?.let { selectedSeason ?: it.season }
                         loading = true
                         selected = null
                         research = null
@@ -285,7 +295,7 @@ fun ApiFootballScreen(context: Context) {
                                     keyForRequest,
                                     requestedDate,
                                     leagueId = leagueFilter?.id,
-                                    season = leagueFilter?.let { selectedSeason ?: it.season }
+                                    season = seasonFilter
                                 )
                                 val settledCount = settleFinishedApiFixtures(context, result)
                                 Handler(Looper.getMainLooper()).post {
