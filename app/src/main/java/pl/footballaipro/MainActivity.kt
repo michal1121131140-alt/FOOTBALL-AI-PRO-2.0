@@ -842,6 +842,12 @@ fun FootballApp(
                                     color = Muted,
                                     fontSize = 11.sp
                                 )
+                                Text(
+                                    "To analiza statystyczna, nie gwarancja wyniku ani porada finansowa. " +
+                                        "Zakłady wiążą się z ryzykiem utraty pieniędzy. Graj odpowiedzialnie, tylko 18+.",
+                                    color = Muted,
+                                    fontSize = 10.sp
+                                )
 
                                 val markets = listOf(
                                     "1", "X", "2",
