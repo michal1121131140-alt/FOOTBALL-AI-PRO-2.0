@@ -392,7 +392,7 @@ fun ApiFootballScreen(context: Context) {
                         it.market.contains("match winner", true) ||
                         it.market.contains("1x2", true) ||
                         it.market.equals("fulltime result", true)
-                    }
+                    }.sortedByDescending { it.odd.toDoubleOrNull() ?: 0.0 }
                     if (marketOdds.isEmpty()) {
                         Text("Brak kursów 1X2 w bazie dla tego meczu. Pokrycie zależy od ligi i bukmachera.", color = ApiMuted, fontSize = 11.sp)
                     } else {
@@ -403,6 +403,7 @@ fun ApiFootballScreen(context: Context) {
                                 "away" to parseApiPercent(it.awayWin)
                             )
                         } ?: emptyMap()
+                        val saveButtonSelections = mutableSetOf<String>()
                         marketOdds.take(24).forEach { odd ->
                             val selection = odd.selection.lowercase(Locale.ROOT)
                             val key = when {
@@ -425,7 +426,8 @@ fun ApiFootballScreen(context: Context) {
                             Text(odd.bookmaker + " • " + odd.selection + ": " + odd.odd, color = ApiWhite, fontSize = 11.sp)
                             if (
                                 value != null && betSelection != null &&
-                                probability != null && decimalOdd != null
+                                probability != null && decimalOdd != null &&
+                                saveButtonSelections.add(key)
                             ) {
                                 Button(
                                     onClick = {
