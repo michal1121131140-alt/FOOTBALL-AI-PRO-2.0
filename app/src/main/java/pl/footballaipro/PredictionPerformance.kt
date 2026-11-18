@@ -3,6 +3,7 @@ package pl.footballaipro
 
 import android.content.Context
 import org.json.JSONArray
+import java.util.UUID
 import org.json.JSONObject
 
 data class PredictionRecord(
@@ -118,7 +119,7 @@ object PredictionPerformance {
         require(stake > 0.0 && stake.isFinite())
 
         return PredictionRecord(
-            id = "${System.currentTimeMillis()}_${match.home}_${match.away}",
+            id = UUID.randomUUID().toString(),
             league = match.league,
             home = match.home,
             away = match.away,
