@@ -44,7 +44,11 @@ object ApiFootballSettings {
                 "Nie udało się zapisać zaszyfrowanego klucza."
             }
             stored
-        }.getOrElse { stored }
+        }.getOrElse {
+            // Never keep returning a legacy plaintext credential if encryption fails.
+            preferences.edit().remove(KEY_API).commit()
+            ""
+        }
     }
 
     @Synchronized
