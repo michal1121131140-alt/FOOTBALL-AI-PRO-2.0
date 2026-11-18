@@ -209,8 +209,41 @@ fun ApiFootballScreen(context: Context) {
                     if (marketOdds.isEmpty()) {
                         Text("Brak kursów 1X2 w bazie dla tego meczu. Pokrycie zależy od ligi i bukmachera.", color = ApiMuted, fontSize = 11.sp)
                     } else {
-                        marketOdds.take(18).forEach { odd ->
+                        val probabilities = prediction?.let {
+                            mapOf(
+                                "home" to parseApiPercent(it.homeWin),
+                                "draw" to parseApiPercent(it.draw),
+                                "away" to parseApiPercent(it.awayWin)
+                            )
+                        } ?: emptyMap()
+                        marketOdds.take(24).forEach { odd ->
+                            val selection = odd.selection.lowercase(Locale.ROOT)
+                            val key = when {
+                                selection == "1" || selection.contains("home") -> "home"
+                                selection == "x" || selection.contains("draw") -> "draw"
+                                selection == "2" || selection.contains("away") -> "away"
+                                else -> ""
+                            }
+                            val probability = probabilities[key]
+                            val decimalOdd = odd.odd.toDoubleOrNull()
+                            val value = if (probability != null && decimalOdd != null && decimalOdd > 1.0) {
+                                runCatching { ValueBetting.calculate(probability, decimalOdd) }.getOrNull()
+                            } else null
                             Text(odd.bookmaker + " • " + odd.selection + ": " + odd.odd, color = ApiWhite, fontSize = 11.sp)
+                            if (value != null) {
+                                Text(
+                                    "Model: " + String.format(Locale.US, "%.1f%%", value.modelProbability) +
+                                        " • implikowane: " + String.format(Locale.US, "%.1f%%", value.impliedProbability) +
+                                        " • EV: " + String.format(Locale.US, "%+.1f%%", value.expectedValuePercent),
+                                    color = if (value.isValueBet) ApiGreen else ApiMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                        if (prediction == null) {
+                            Text("Porównanie wartości wymaga prognozy 1X2.", color = ApiMuted, fontSize = 10.sp)
+                        } else {
+                            Text("Dodatnie EV oznacza przewagę modelu nad kursem, nie gwarancję zysku.", color = ApiMuted, fontSize = 10.sp)
                         }
                     }
 
@@ -241,4 +274,10 @@ fun ApiFootballScreen(context: Context) {
             }
         }
     }
+}
+
+private fun parseApiPercent(value: String): Double? {
+    val normalized = value.replace(",", ".")
+    val match = Regex("[0-9]+(?:\\.[0-9]+)?").find(normalized) ?: return null
+    return match.value.toDoubleOrNull()?.takeIf { it in 0.01..100.0 }
 }
