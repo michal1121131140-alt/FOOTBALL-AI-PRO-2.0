@@ -21,6 +21,7 @@ data class ApiFootballFixture(
     val home: String,
     val away: String,
     val date: String,
+    val time: String,
     val status: String,
     val score: String
 )
@@ -195,6 +196,7 @@ object ApiFootballRepository {
                         home = home,
                         away = away,
                         date = fixture.optString("date").take(10),
+                        time = fixture.optString("date").substringAfter('T', "").take(5),
                         status = fixture.optJSONObject("status")?.optString("short").orEmpty(),
                         score = score
                     )
