@@ -29,16 +29,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Resolve app version
+        shell: bash
+        run: |
+          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          if [[ -z "$VERSION_NAME" ]]; then
+            echo "Could not read versionName from app/build.gradle.kts" >&2
+            exit 1
+          fi
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+
       - name: Build APK
         run: gradle --no-daemon testDebugUnitTest assembleDebug
 
       - name: Name APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/FOOTBALL-AI-PRO-2.0.4.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/FOOTBALL-AI-PRO-${VERSION_NAME}.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: FOOTBALL-AI-PRO-2.0.4-APK
-          path: app/build/outputs/apk/debug/FOOTBALL-AI-PRO-2.0.4.apk
+          name: FOOTBALL-AI-PRO-${{ env.VERSION_NAME }}-APK
+          path: app/build/outputs/apk/debug/FOOTBALL-AI-PRO-${{ env.VERSION_NAME }}.apk
           if-no-files-found: error
-          
