@@ -1,3 +1,5 @@
+import java.util.Base64
+
 
 plugins {
     id("com.android.application")
@@ -10,7 +12,7 @@ val stableDebugKeystoreBase64 = file("debug.keystore.base64")
 if (stableDebugKeystoreBase64.exists()) {
     stableDebugKeystore.parentFile.mkdirs()
     stableDebugKeystore.writeBytes(
-        java.util.Base64.getDecoder().decode(stableDebugKeystoreBase64.readText().trim())
+        Base64.getDecoder().decode(stableDebugKeystoreBase64.readText().trim())
     )
 }
 
