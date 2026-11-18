@@ -436,7 +436,21 @@ fun FootballApp(
                         context = context,
                         selectedDate = date,
                         onDateChanged = { date = it },
-                        onFixturesLoaded = { globalMatches = it },
+                        onFixturesLoaded = { loaded ->
+                            globalMatches = loaded
+                            if (loaded.isNotEmpty() && globalSeasonMatches.isNotEmpty()) {
+                                val refreshedKeys = loaded.map {
+                                    "${it.league}|${it.home}|${it.away}|${it.date}"
+                                }.toSet()
+                                globalSeasonMatches = (
+                                    globalSeasonMatches.filterNot {
+                                        "${it.league}|${it.home}|${it.away}|${it.date}" in refreshedKeys
+                                    } + loaded
+                                ).distinctBy {
+                                    "${it.league}|${it.home}|${it.away}|${it.date}"
+                                }
+                            }
+                        },
                         onSeasonMatchesLoaded = { globalSeasonMatches = it }
                     )
                 }
