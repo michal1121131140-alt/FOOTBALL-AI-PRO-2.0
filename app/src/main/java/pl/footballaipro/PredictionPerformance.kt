@@ -276,7 +276,10 @@ object PredictionPerformance {
                     String.format(java.util.Locale.US, "%.4f", record.odds),
                     String.format(java.util.Locale.US, "%.2f", record.probability),
                     String.format(java.util.Locale.US, "%.2f", record.stake),
-                    record.createdAt.toString(),
+                    java.text.SimpleDateFormat(
+                        "yyyy-MM-dd HH:mm:ss",
+                        java.util.Locale.US
+                    ).format(java.util.Date(record.createdAt)),
                     record.matchDate,
                     if (record.settled) "TAK" else "NIE",
                     when (record.won) { true -> "TAK"; false -> "NIE"; null -> "" },
