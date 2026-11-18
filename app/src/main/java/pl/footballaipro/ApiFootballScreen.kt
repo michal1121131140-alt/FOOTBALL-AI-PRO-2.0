@@ -156,7 +156,9 @@ fun ApiFootballScreen(context: Context) {
                                 }
                             } catch (e: Exception) {
                                 Handler(Looper.getMainLooper()).post {
-                                    status = "Błąd klucza/API: " + (e.message ?: "nieznany błąd")
+                                    if (apiKey.trim() == keyToCheck) {
+                                        status = "Błąd klucza/API: " + (e.message ?: "nieznany błąd")
+                                    }
                                     loading = false
                                 }
                             }
@@ -318,7 +320,13 @@ fun ApiFootballScreen(context: Context) {
                                 }
                             } catch (e: Exception) {
                                 Handler(Looper.getMainLooper()).post {
-                                    status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
+                                    if (
+                                        date == requestedDate &&
+                                        selectedLeague?.id == leagueFilter?.id &&
+                                        selectedSeason == seasonFilter
+                                    ) {
+                                        status = "Błąd pobierania: " + (e.message ?: "nieznany błąd")
+                                    }
                                     loading = false
                                 }
                             }
@@ -361,7 +369,9 @@ fun ApiFootballScreen(context: Context) {
                                 }
                             } catch (e: Exception) {
                                 Handler(Looper.getMainLooper()).post {
-                                    status = "Błąd pobierania live: " + (e.message ?: "nieznany błąd")
+                                    if (selectedLeague?.id == leagueFilter?.id) {
+                                        status = "Błąd pobierania live: " + (e.message ?: "nieznany błąd")
+                                    }
                                     loading = false
                                 }
                             }
@@ -408,7 +418,12 @@ fun ApiFootballScreen(context: Context) {
                                 }
                             } catch (e: Exception) {
                                 Handler(Looper.getMainLooper()).post {
-                                    status = "Błąd tabeli: " + (e.message ?: "nieznany błąd")
+                                    if (
+                                        selectedLeague?.id == leagueFilter.id &&
+                                        selectedSeason == seasonForRequest
+                                    ) {
+                                        status = "Błąd tabeli: " + (e.message ?: "nieznany błąd")
+                                    }
                                     loading = false
                                 }
                             }
@@ -502,7 +517,9 @@ fun ApiFootballScreen(context: Context) {
                                     }
                                 } catch (e: Exception) {
                                     Handler(Looper.getMainLooper()).post {
-                                        status = "Błąd analizy: " + (e.message ?: "nieznany błąd")
+                                        if (selected?.id == fixture.id) {
+                                            status = "Błąd analizy: " + (e.message ?: "nieznany błąd")
+                                        }
                                         loading = false
                                     }
                                 }
