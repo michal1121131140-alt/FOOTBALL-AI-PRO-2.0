@@ -183,15 +183,17 @@ fun PerformanceScreen(seasonMatches: List<FootballMatch> = emptyList()) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            marketStats.forEach { market ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(market.market, fontWeight = FontWeight.Bold)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    marketStats.forEach { market ->
                         Text(
-                            "Trafione: ${market.wins}/${market.settled} • Skuteczność: ${format(market.winRate)}%"
-                        )
-                        Text(
-                            "ROI: ${format(market.roi)}% • Bilans: ${format(market.totalProfit)}"
+                            "${market.market}: ${market.wins}/${market.settled} trafień • " +
+                                "${format(market.winRate)}% • ROI ${format(market.roi)}% • " +
+                                "${format(market.totalProfit)}",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
