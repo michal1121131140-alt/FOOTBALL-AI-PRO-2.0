@@ -67,11 +67,11 @@ object FootballDataRepository {
 
             val results = item.optJSONArray("matchResults") ?: continue
             val finalResult = findFinalResult(results) ?: continue
-            if (!finalResult.has("pointsTeam1") ||
-                !finalResult.has("pointsTeam2")) continue
-
-            val goalsHome = finalResult.optInt("pointsTeam1")
-            val goalsAway = finalResult.optInt("pointsTeam2")
+            val goalsHome = finalResult.opt("pointsTeam1")
+                ?.toString()?.toIntOrNull() ?: continue
+            val goalsAway = finalResult.opt("pointsTeam2")
+                ?.toString()?.toIntOrNull() ?: continue
+            if (goalsHome < 0 || goalsAway < 0) continue
 
             val homeRecord = records.getOrPut(home) { TeamRecord() }
             val awayRecord = records.getOrPut(away) { TeamRecord() }
