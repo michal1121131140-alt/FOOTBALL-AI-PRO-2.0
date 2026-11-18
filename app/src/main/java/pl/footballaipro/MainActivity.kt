@@ -2,6 +2,7 @@
 package pl.footballaipro
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -263,6 +264,7 @@ fun FootballApp(
     var expanded by remember { mutableStateOf(false) }
     var tableLoading by remember { mutableStateOf(false) }
     var analysisLoading by remember { mutableStateOf(false) }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     var oddsInput by remember { mutableStateOf("") }
     var stakeInput by remember { mutableStateOf("1.00") }
@@ -1077,17 +1079,57 @@ fun FootballApp(
                     Text("Zapisane przez Ciebie spotkania.", color = Muted, fontSize = 11.sp)
                     Spacer(Modifier.height(10.dp))
 
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                FootballStorage.saveHistory(context, emptyList())
-                                status = "Historia wyczyszczona."
-                            }
-                        },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Panel)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("WYCZYŚĆ HISTORIĘ")
+                        Button(
+                            onClick = { showClearHistoryDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Panel)
+                        ) {
+                            Text("WYCZYŚĆ")
+                        }
+                        Button(
+                            onClick = {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_SUBJECT, "FOOTBALL AI PRO — historia meczów")
+                                    putExtra(Intent.EXTRA_TEXT, FootballStorage.exportHistoryCsv(history))
+                                }
+                                context.startActivity(
+                                    Intent.createChooser(shareIntent, "Eksportuj historię meczów")
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Blue)
+                        ) {
+                            Text("EKSPORT CSV")
+                        }
+                    }
+
+                    if (showClearHistoryDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearHistoryDialog = false },
+                            title = { Text("Wyczyścić historię?") },
+                            text = { Text("Zapisane mecze zostaną usunięte z tego urządzenia. Tej operacji nie można cofnąć.") },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showClearHistoryDialog = false
+                                        scope.launch {
+                                            FootballStorage.saveHistory(context, emptyList())
+                                            status = "Historia wyczyszczona."
+                                        }
+                                    }
+                                ) { Text("WYCZYŚĆ") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearHistoryDialog = false }) {
+                                    Text("ANULUJ")
+                                }
+                            }
+                        )
                     }
 
                     LazyColumn(
