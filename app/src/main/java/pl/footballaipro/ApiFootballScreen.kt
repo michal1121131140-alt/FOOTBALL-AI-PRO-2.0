@@ -239,11 +239,15 @@ fun ApiFootballScreen(context: Context) {
                                     leagueId = leagueFilter?.id,
                                     season = leagueFilter?.season
                                 )
+                                val settledCount = settleFinishedApiFixtures(context, result)
                                 Handler(Looper.getMainLooper()).post {
                                     fixtures = result
-                                    status = if (result.isEmpty()) {
+                                    val message = if (result.isEmpty()) {
                                         "Brak spotkań w bazie dla tej daty."
                                     } else "Znaleziono spotkań: " + result.size
+                                    status = message + if (settledCount > 0) {
+                                        " • rozliczono typów: " + settledCount
+                                    } else ""
                                     loading = false
                                 }
                             } catch (e: Exception) {
@@ -467,6 +471,7 @@ fun ApiFootballScreen(context: Context) {
                             if (
                                 value != null && betSelection != null &&
                                 probability != null && decimalOdd != null &&
+                                !isFinishedFixture(fixture.status) &&
                                 saveButtonSelections.add(key)
                             ) {
                                 Button(
@@ -580,3 +585,30 @@ internal fun fixtureStatusLabel(status: String): String = when (status.uppercase
     "LIVE" -> "Na żywo"
     else -> status.ifBlank { "Brak statusu" }
 }
+
+internal fun isFinishedFixture(status: String): Boolean =
+    status.uppercase(Locale.ROOT) in setOf("FT", "AET", "PEN", "AWD", "WO")
+
+private fun settleFinishedApiFixtures(
+    context: Context,
+    fixtures: List<ApiFootballFixture>
+): Int {
+    return fixtures.sumOf { fixture ->
+        if (!isFinishedFixture(fixture.status)) {
+            0
+        } else {
+            PredictionPerformance.settleMatch(
+                context,
+                FootballMatch(
+                    league = fixture.leagueName,
+                    home = fixture.home,
+                    away = fixture.away,
+                    score = fixture.score,
+                    date = fixture.date,
+                    source = "API-Football"
+                )
+            )
+        }
+    }
+}
+
